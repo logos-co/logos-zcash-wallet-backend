@@ -143,3 +143,105 @@ mod tests {
         assert_eq!(j.pending().len(), 1);
     }
 }
+
+/// One send, from request to settlement. Only one may be open per wallet.
+#[derive(Debug, Clone)]
+pub struct Send {
+    pub requester: String,
+    pub state: String,
+    pub created: std::time::Instant,
+    pub previewed_at: Option<std::time::Instant>,
+    pub proposal_id: String,
+    pub preview: Value,
+    pub job: Option<String>,
+    pub result: Value,
+    pub error: String,
+}
+
+pub const PREVIEW_TTL_SECS: u64 = 120;
+
+#[derive(Default)]
+pub struct Sends {
+    next: u64,
+    pub map: HashMap<String, Send>,
+}
+
+impl Sends {
+    /// The open send, if any: anything not yet settled.
+    pub fn open(&self) -> Option<&str> {
+        self.map
+            .iter()
+            .find(|(_, s)| matches!(s.state.as_str(), "preparing" | "previewed" | "signing"))
+            .map(|(k, _)| k.as_str())
+    }
+
+    pub fn add(&mut self, requester: &str, job: &str) -> String {
+        self.next += 1;
+        let id = format!("s{}", self.next);
+        self.map.insert(
+            id.clone(),
+            Send {
+                requester: requester.into(),
+                state: "preparing".into(),
+                created: std::time::Instant::now(),
+                previewed_at: None,
+                proposal_id: String::new(),
+                preview: Value::Null,
+                job: Some(job.into()),
+                result: Value::Null,
+                error: String::new(),
+            },
+        );
+        id
+    }
+
+    /// Previews older than the TTL fail; returns the ids that changed.
+    pub fn expire(&mut self) -> Vec<String> {
+        let mut changed = vec![];
+        for (id, s) in self.map.iter_mut() {
+            if s.state == "previewed" && s.previewed_at.is_some_and(|t| t.elapsed().as_secs() > PREVIEW_TTL_SECS) {
+                s.state = "expired".into();
+                s.error = "the preview expired before approval".into();
+                changed.push(id.clone());
+            }
+        }
+        changed
+    }
+
+    pub fn status(&self, id: &str) -> Value {
+        match self.map.get(id) {
+            None => json!({"ok": false, "error": "unknown send"}),
+            Some(s) => json!({
+                "ok": true, "requestId": id, "state": s.state, "requester": s.requester,
+                "preview": s.preview, "result": s.result, "error": s.error,
+                "ttlSecs": s.previewed_at.map(|t| PREVIEW_TTL_SECS.saturating_sub(t.elapsed().as_secs())),
+            }),
+        }
+    }
+}
+
+#[cfg(test)]
+mod send_tests {
+    use super::*;
+
+    #[test]
+    fn one_open_send() {
+        let mut s = Sends::default();
+        assert!(s.open().is_none());
+        let id = s.add("some_dapp", "b1");
+        assert_eq!(s.open(), Some(id.as_str()));
+        s.map.get_mut(&id).unwrap().state = "sent".into();
+        assert!(s.open().is_none());
+    }
+
+    #[test]
+    fn previews_expire() {
+        let mut s = Sends::default();
+        let id = s.add("x", "b1");
+        let e = s.map.get_mut(&id).unwrap();
+        e.state = "previewed".into();
+        e.previewed_at = Some(std::time::Instant::now() - std::time::Duration::from_secs(PREVIEW_TTL_SECS + 1));
+        assert_eq!(s.expire(), vec![id.clone()]);
+        assert_eq!(s.status(&id)["state"], "expired");
+    }
+}

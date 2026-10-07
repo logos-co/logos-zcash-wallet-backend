@@ -15,7 +15,7 @@ use serde_json::{json, Value};
 use zeroize::Zeroizing;
 
 use crate::gate::{self, Caller, Roles};
-use crate::model::{is_network, unwrap_core, Jobs, NETWORKS};
+use crate::model::{is_network, unwrap_core, Jobs, Sends, NETWORKS};
 
 pub trait ZcashWalletBackendModule: Send + Sync + 'static {
     /// CUSTODIAN. Replaces both roles: `{ approvers?, custodians? }`. Total, and saved.
@@ -60,6 +60,20 @@ pub trait ZcashWalletBackendModule: Send + Sync + 'static {
     fn apply_preset(&self, name: String) -> String;
     fn set_proxy(&self, config_json: String) -> String;
 
+    /// Any named module. `request_json`: `{ recipients: [{ address, amount (zatoshis),
+    /// memo? }] }` or `{ uri }`, plus `allowMixedPools?`. `{ ok, requestId }`; one open
+    /// send per wallet.
+    fn prepare_send(&self, request_json: String) -> String;
+    /// `{ ok, requestId, state: preparing|previewed|signing|sent|failed|expired|cancelled|unknown,
+    /// requester, preview, result, error, ttlSecs }`.
+    fn send_status(&self, request_id: String) -> String;
+    /// `{ ok, sends: [{ requestId, state, requester }] }`.
+    fn list_sends(&self) -> String;
+    /// APPROVER. Proves, signs and broadcasts a previewed send with the wallet password.
+    fn approve_send(&self, request_id: String, password: String) -> String;
+    /// The requester or an approver, until approval.
+    fn cancel_send(&self, request_id: String) -> String;
+
     fn on_context_ready(&self, _ctx: &RustModuleContext) {}
 }
 
@@ -69,6 +83,7 @@ pub trait ZcashWalletBackendModuleEvents {
     fn balance_changed(&self, payload: String);
     fn server_health_changed(&self, payload: String);
     fn job_finished(&self, job_id: String, state: String);
+    fn send_status_changed(&self, request_id: String, state: String);
 }
 
 include!(concat!(env!("CARGO_MANIFEST_DIR"), "/generated/provider_gen.rs"));
@@ -76,6 +91,7 @@ include!(concat!(env!("CARGO_MANIFEST_DIR"), "/generated/provider_gen.rs"));
 #[derive(Default)]
 struct Inner {
     jobs: Jobs,
+    sends: Sends,
     active: String,
     dir: Option<PathBuf>,
 }
@@ -255,17 +271,60 @@ fn reactor(inner: Arc<Mutex<Inner>>, stop: Arc<AtomicBool>) {
                     }
                 }
                 let final_state = j.state.clone();
+                let (kind, result, error) = (j.kind.clone(), j.result.clone(), j.error.clone());
+                let changed = settle_send(&mut g.sends, &jid, &kind, &final_state, &result, &error);
                 drop(g);
                 emit_job_finished(&jid, &final_state);
+                if let Some((sid, st)) = changed {
+                    emit_send_status_changed(&sid, &st);
+                }
             }
+        }
+        let expired = inner.lock().unwrap().sends.expire();
+        for sid in expired {
+            emit_send_status_changed(&sid, "expired");
         }
         std::thread::sleep(Duration::from_millis(500));
     }
 }
 
+/// Moves the send a finished job belongs to. Returns the send id and its new state.
+fn settle_send(sends: &mut Sends, jid: &str, kind: &str, state: &str, result: &Value, error: &str) -> Option<(String, String)> {
+    let (sid, s) = sends.map.iter_mut().find(|(_, s)| s.job.as_deref() == Some(jid))?;
+    s.job = None;
+    match (kind, state) {
+        ("propose", "done") => {
+            s.state = "previewed".into();
+            s.previewed_at = Some(std::time::Instant::now());
+            s.proposal_id = result.get("proposalId").and_then(Value::as_str).unwrap_or_default().into();
+            s.preview = result.get("preview").cloned().unwrap_or(Value::Null);
+        }
+        ("sign_and_send", "done") => {
+            let txs = result.get("transactions").and_then(Value::as_array).cloned().unwrap_or_default();
+            let all = !txs.is_empty() && txs.iter().all(|t| t.get("accepted").and_then(Value::as_bool) == Some(true));
+            s.state = if all { "sent".into() } else { "failed".into() };
+            s.result = result.clone();
+            if !all {
+                s.error = "a server refused the transaction; see result".into();
+            }
+        }
+        // The engine stopped answering mid-broadcast: the outcome cannot be known.
+        ("sign_and_send", _) if error.contains("stopped answering") => {
+            s.state = "unknown".into();
+            s.error = error.into();
+        }
+        (_, _) => {
+            s.state = "failed".into();
+            s.error = error.into();
+        }
+    }
+    Some((sid.clone(), s.state.clone()))
+}
+
 /// Relays the core's and the node module's events under the backend's names.
 fn relay_events(stop: Arc<AtomicBool>) {
-    let core = modules().zcash_wallet_core_module;
+    use zcash_wallet_core_module::ZcashWalletCoreModuleClient as Core;
+    let mut core = modules().zcash_wallet_core_module;
     if let Ok(sub) = core.on_sync_progress() {
         let stop = stop.clone();
         std::thread::spawn(move || {
@@ -273,8 +332,8 @@ fn relay_events(stop: Arc<AtomicBool>) {
                 if stop.load(Ordering::SeqCst) {
                     break;
                 }
-                if let Ok(payload) = ZcashWalletCoreModuleClient::decode_sync_progress(&ev) {
-                    emit_sync_progress(&payload);
+                if let Some(e) = Core::decode_sync_progress(&ev) {
+                    emit_sync_progress(&e.payload);
                 }
             }
         });
@@ -286,8 +345,8 @@ fn relay_events(stop: Arc<AtomicBool>) {
                 if stop.load(Ordering::SeqCst) {
                     break;
                 }
-                if let Ok(payload) = ZcashWalletCoreModuleClient::decode_balance_changed(&ev) {
-                    emit_balance_changed(&payload);
+                if let Some(e) = Core::decode_balance_changed(&ev) {
+                    emit_balance_changed(&e.payload);
                 }
             }
         });
@@ -298,8 +357,8 @@ fn relay_events(stop: Arc<AtomicBool>) {
                 if stop.load(Ordering::SeqCst) {
                     break;
                 }
-                if let Ok(payload) = ZcashWalletCoreModuleClient::decode_wallet_state_changed(&ev) {
-                    emit_wallet_state_changed(&payload);
+                if let Some(e) = Core::decode_wallet_state_changed(&ev) {
+                    emit_wallet_state_changed(&e.payload);
                 }
             }
         });
@@ -478,6 +537,85 @@ impl ZcashWalletBackendModule for ZcashWalletBackendModuleImpl {
             return refused();
         }
         self.core_read(modules().zcash_node_module.set_proxy(&self.active(), &config_json))
+    }
+
+    fn prepare_send(&self, request_json: String) -> String {
+        let caller = caller();
+        let Some(requester) = caller.named().map(String::from) else { return refused() };
+        let input: Value = match serde_json::from_str(&request_json) {
+            Ok(v) => v,
+            Err(e) => return err(format!("request: {e}")),
+        };
+        if let Some(open) = self.inner.lock().unwrap().sends.open() {
+            return err(format!("send {open} is still open"));
+        }
+        let params = Zeroizing::new(json!({"send": input}).to_string());
+        let reply = self.start_core_job("propose", params);
+        let v: Value = serde_json::from_str(&reply).unwrap_or(Value::Null);
+        let Some(jid) = v.get("jobId").and_then(Value::as_str) else { return reply };
+        let sid = self.inner.lock().unwrap().sends.add(&requester, jid);
+        emit_send_status_changed(&sid, "preparing");
+        json!({"ok": true, "requestId": sid}).to_string()
+    }
+
+    fn send_status(&self, request_id: String) -> String {
+        self.inner.lock().unwrap().sends.status(&request_id).to_string()
+    }
+
+    fn list_sends(&self) -> String {
+        let g = self.inner.lock().unwrap();
+        let sends: Vec<Value> = g
+            .sends
+            .map
+            .iter()
+            .map(|(id, s)| json!({"requestId": id, "state": s.state, "requester": s.requester}))
+            .collect();
+        json!({"ok": true, "sends": sends}).to_string()
+    }
+
+    fn approve_send(&self, request_id: String, password: String) -> String {
+        let password = Zeroizing::new(password);
+        if !gate::approver_admits("approve_send", &self.roles.lock().unwrap(), &caller()) {
+            return refused();
+        }
+        let proposal = {
+            let g = self.inner.lock().unwrap();
+            match g.sends.map.get(&request_id) {
+                None => return err("unknown send"),
+                Some(s) if s.state != "previewed" => return err(format!("send is {}, not previewed", s.state)),
+                Some(s) if s.previewed_at.is_some_and(|t| t.elapsed().as_secs() > crate::model::PREVIEW_TTL_SECS) => {
+                    return err("the preview expired; prepare the send again")
+                }
+                Some(s) => s.proposal_id.clone(),
+            }
+        };
+        let params = Zeroizing::new(json!({"proposalId": proposal, "password": password.as_str()}).to_string());
+        let reply = self.start_core_job("sign_and_send", params);
+        let v: Value = serde_json::from_str(&reply).unwrap_or(Value::Null);
+        let Some(jid) = v.get("jobId").and_then(Value::as_str) else { return reply };
+        if let Some(s) = self.inner.lock().unwrap().sends.map.get_mut(&request_id) {
+            s.state = "signing".into();
+            s.job = Some(jid.into());
+        }
+        emit_send_status_changed(&request_id, "signing");
+        json!({"ok": true, "requestId": request_id}).to_string()
+    }
+
+    fn cancel_send(&self, request_id: String) -> String {
+        let c = caller();
+        let approver = gate::approver_admits("approve_send", &self.roles.lock().unwrap(), &c);
+        let mut g = self.inner.lock().unwrap();
+        let Some(s) = g.sends.map.get_mut(&request_id) else { return err("unknown send") };
+        if !(approver || c.named() == Some(s.requester.as_str())) {
+            return refused();
+        }
+        if !matches!(s.state.as_str(), "preparing" | "previewed") {
+            return err(format!("send is {}; it can no longer be cancelled", s.state));
+        }
+        s.state = "cancelled".into();
+        drop(g);
+        emit_send_status_changed(&request_id, "cancelled");
+        json!({"ok": true, "requestId": request_id}).to_string()
     }
 
     fn on_context_ready(&self, ctx: &RustModuleContext) {
