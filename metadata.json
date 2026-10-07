@@ -1,0 +1,23 @@
+{
+  "name": "zcash_wallet_backend",
+  "display_name": "Zcash Wallet Backend",
+  "version": "0.1.0",
+  "type": "core",
+  "interface": "cdylib",
+  "concurrency": "multi",
+  "category": "wallet",
+  "description": "Zcash wallet coordinator: roles, engine jobs, events, and server routes. Holds no key material.",
+  "author": "Logos Core Team",
+  "main": "zcash_wallet_backend_plugin",
+  "dependencies": ["zcash_wallet_core_module", "zcash_node_module"],
+  "include": [],
+  "capabilities": [],
+  "codegen": {
+    "rust": { "crate": "rust-lib", "trait": "ZcashWalletBackendModule", "source": "src/glue.rs" }
+  },
+  "nix": {
+    "external_libraries": [],
+    "packages": { "build": [], "runtime": [] },
+    "cmake": { "find_packages": [], "extra_include_dirs": [] }
+  }
+}
