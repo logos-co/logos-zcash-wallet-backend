@@ -15,7 +15,7 @@ use serde_json::{json, Value};
 use zeroize::Zeroizing;
 
 use crate::gate::{self, Caller, Roles};
-use crate::model::{is_network, unwrap_core, Jobs, Sends, NETWORKS};
+use crate::model::{core_routes, is_network, networks, unwrap_core, Jobs, Sends};
 
 pub trait ZcashWalletBackendModule: Send + Sync + 'static {
     /// CUSTODIAN. Replaces both roles: `{ approvers?, custodians? }`. Total, and saved.
@@ -115,6 +115,8 @@ struct Inner {
     sends: Sends,
     active: String,
     dir: Option<PathBuf>,
+    /// A test harness put `regtest.json` in the persistence directory.
+    regtest: bool,
 }
 
 pub struct ZcashWalletBackendModuleImpl {
@@ -179,18 +181,7 @@ impl ZcashWalletBackendModuleImpl {
 
     /// The route table for a network, in the shape the core's jobs take.
     fn routes(&self, network: &str) -> Result<Value, String> {
-        let t = parse(modules().zcash_node_module.route_table(network), "node module")?;
-        let t = unwrap_core(&t)?;
-        let proxy = t.get("proxy").and_then(Value::as_str).filter(|p| !p.is_empty()).ok_or("no proxy is set")?;
-        let servers: Vec<String> = t
-            .get("sync")
-            .and_then(Value::as_array)
-            .map(|a| a.iter().filter_map(|s| s.get("url").and_then(Value::as_str).map(String::from)).collect())
-            .unwrap_or_default();
-        if servers.is_empty() {
-            return Err("no server is enabled".into());
-        }
-        Ok(json!({"proxy": proxy, "servers": servers}))
+        core_routes(&parse(modules().zcash_node_module.route_table(network), "node module")?)
     }
 
     /// Starts a core job and tracks it under a backend id. `params` may hold a
@@ -444,14 +435,15 @@ impl ZcashWalletBackendModule for ZcashWalletBackendModuleImpl {
     }
 
     fn list_networks(&self) -> String {
-        json!({"ok": true, "networks": NETWORKS, "active": self.active()}).to_string()
+        let g = self.inner.lock().unwrap();
+        json!({"ok": true, "networks": networks(g.regtest), "active": g.active}).to_string()
     }
 
     fn set_active_network(&self, network: String) -> String {
         if !self.custodian("set_active_network") {
             return refused();
         }
-        if !is_network(&network) {
+        if !is_network(&network, self.inner.lock().unwrap().regtest) {
             return err("unknown network");
         }
         if self.open_name().is_some() {
@@ -741,9 +733,11 @@ impl ZcashWalletBackendModule for ZcashWalletBackendModuleImpl {
         *self.roles.lock().unwrap() = Roles::from_file(roles.as_deref());
         {
             let mut g = self.inner.lock().unwrap();
+            // A local test chain, for test harnesses only; the core and node module read the same file.
+            g.regtest = dir.join("regtest.json").is_file();
             if let Ok(s) = std::fs::read_to_string(dir.join("settings.json")) {
                 if let Some(n) = serde_json::from_str::<Value>(&s).ok().and_then(|v| v["activeNetwork"].as_str().map(String::from)) {
-                    if is_network(&n) {
+                    if is_network(&n, g.regtest) {
                         g.active = n;
                     }
                 }

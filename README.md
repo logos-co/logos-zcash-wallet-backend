@@ -40,6 +40,13 @@ resending with `allowMixedPools: true` is the consent ZIP 315 asks for. Shieldin
 (`prepare_shielding(address)`, or every eligible address with an empty address) follows
 the same review and approval.
 
+## Regtest (test harnesses)
+
+With a `regtest.json` in this module's persistence directory, `list_networks` also offers
+`regtest` and `set_active_network` takes it. The wallet core and `zcash_node_module` need the
+same file in theirs. The node module's regtest routes (proxy `direct`, `http://127.0.0.1:PORT`
+servers) reach the core unchanged.
+
 ## Everything else
 
 Reads (`wallet_status`, `sync_status`, `balances`, `receive_info`, `history`,
