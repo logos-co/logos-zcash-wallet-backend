@@ -6174,6 +6174,36 @@
         "type": "github"
       }
     },
+    "logos-zebra-nix_2": {
+      "inputs": {
+        "logos-nix": [
+          "zcash_wallet_core_module",
+          "zebrad_module",
+          "logos-module-builder",
+          "logos-nix"
+        ],
+        "nixpkgs": [
+          "zcash_wallet_core_module",
+          "zebrad_module",
+          "logos-module-builder",
+          "nixpkgs"
+        ],
+        "rust-overlay": "rust-overlay_5"
+      },
+      "locked": {
+        "lastModified": 1791456664,
+        "narHash": "sha256-dZ13hsvZH+p50+gLS6yUNGFRveos8E8eS4c9qmCUqW4=",
+        "owner": "logos-co",
+        "repo": "logos-zebra-nix",
+        "rev": "dd35e5c71e5f86d806cd4d58b8e409c936f99008",
+        "type": "github"
+      },
+      "original": {
+        "owner": "logos-co",
+        "repo": "logos-zebra-nix",
+        "type": "github"
+      }
+    },
     "nix-bundle-appimage": {
       "inputs": {
         "logos-nix": [
@@ -9729,6 +9759,29 @@
         "type": "github"
       }
     },
+    "rust-overlay_5": {
+      "inputs": {
+        "nixpkgs": [
+          "zcash_wallet_core_module",
+          "zebrad_module",
+          "logos-zebra-nix",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1787713867,
+        "narHash": "sha256-ZRYTEvDb8QZLCHRoMyIZle9V3Bvw905m0teeo1RvI7M=",
+        "owner": "oxalica",
+        "repo": "rust-overlay",
+        "rev": "494680f9ffa2b4bf9f2df0f442c7096e44adfa00",
+        "type": "github"
+      },
+      "original": {
+        "owner": "oxalica",
+        "repo": "rust-overlay",
+        "type": "github"
+      }
+    },
     "zcash_node_module": {
       "inputs": {
         "logos-module-builder": [
@@ -9737,11 +9790,11 @@
         "zebrad_module": "zebrad_module"
       },
       "locked": {
-        "lastModified": 1791472927,
-        "narHash": "sha256-jD+eXo29XmStPS30SRzjG9vAqbq3EjVnM/L6K2tWsGM=",
+        "lastModified": 1791479609,
+        "narHash": "sha256-37dlCWWFCw4CjqKWlH+ag1cAZo+/MfjUHe+9zKr02bM=",
         "owner": "logos-co",
         "repo": "logos-zcash-node-module",
-        "rev": "36fa80c3813190c39bbbaff50b405344a1829924",
+        "rev": "1f2b701575e2084dacc2a019183591c5212a00a7",
         "type": "github"
       },
       "original": {
@@ -9754,14 +9807,15 @@
       "inputs": {
         "logos-module-builder": [
           "logos-module-builder"
-        ]
+        ],
+        "zebrad_module": "zebrad_module_2"
       },
       "locked": {
-        "lastModified": 1791420813,
-        "narHash": "sha256-Ac/1gLfev8jw+ak4coLzzqT5Bw8n1EbbKgKhaSFTqMU=",
+        "lastModified": 1791479612,
+        "narHash": "sha256-m6xGgsVdlk1uDlhAsUxJuQcP/st7Kr6qcG6bU4DQ4sw=",
         "owner": "logos-co",
         "repo": "logos-zcash-wallet-core-module",
-        "rev": "984ab63c3cace04b782358445ba08aafaec25bbe",
+        "rev": "6bdf4b9c1f674eab2da5b9cb47878b72216330d9",
         "type": "github"
       },
       "original": {
@@ -9779,11 +9833,33 @@
         "logos-zebra-nix": "logos-zebra-nix"
       },
       "locked": {
-        "lastModified": 1791456750,
-        "narHash": "sha256-s4qvQvHw03GmACMj2G5eNOPUeX2zUFSdONLbUXVVHzg=",
+        "lastModified": 1791467372,
+        "narHash": "sha256-YevJL9mlH4pR9kz5sclU1yOH787J9VVEgxbzcEcCkJo=",
         "owner": "logos-co",
         "repo": "logos-zebrad-module",
-        "rev": "9b9e84f9daeffd5b8f6cf93e4c5b623b9d1605a8",
+        "rev": "41f1e4294d04a840af2cbd90c4b5c9bd3057a4cb",
+        "type": "github"
+      },
+      "original": {
+        "owner": "logos-co",
+        "repo": "logos-zebrad-module",
+        "type": "github"
+      }
+    },
+    "zebrad_module_2": {
+      "inputs": {
+        "logos-module-builder": [
+          "zcash_wallet_core_module",
+          "logos-module-builder"
+        ],
+        "logos-zebra-nix": "logos-zebra-nix_2"
+      },
+      "locked": {
+        "lastModified": 1791467372,
+        "narHash": "sha256-YevJL9mlH4pR9kz5sclU1yOH787J9VVEgxbzcEcCkJo=",
+        "owner": "logos-co",
+        "repo": "logos-zebrad-module",
+        "rev": "41f1e4294d04a840af2cbd90c4b5c9bd3057a4cb",
         "type": "github"
       },
       "original": {
