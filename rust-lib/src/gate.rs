@@ -217,6 +217,20 @@ mod tests {
     }
 
     #[test]
+    fn server_settings_need_the_custodian() {
+        let mut r = Roles::default();
+        r.configure(r#"{"approvers": ["zcash_wallet_cli"], "custodians": ["zcash_wallet_ui"]}"#).unwrap();
+        for method in ["set_servers", "clear_suspect"] {
+            assert!(custodian_admits(method, &r, &m("zcash_wallet_ui")), "{method}");
+            for who in [m("zcash_wallet_cli"), m("some_dapp"), Caller::HostAnchor, Caller::Unknown] {
+                assert!(!custodian_admits(method, &r, &who), "{method} {who:?}");
+            }
+            // Neither the approver role nor the session list reaches them.
+            assert!(!approver_admits(method, &r, &m("zcash_wallet_cli")) && !session_admits(method, &r, &m("zcash_wallet_cli")));
+        }
+    }
+
+    #[test]
     fn refusal_is_exact() {
         assert!(NOT_AUTHORIZED.starts_with(r#"{"ok":false,"#));
         let v: serde_json::Value = serde_json::from_str(NOT_AUTHORIZED).unwrap();

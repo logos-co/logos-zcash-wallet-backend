@@ -63,6 +63,9 @@ pub trait ZcashWalletBackendModule: Send + Sync + 'static {
     /// CUSTODIAN. Passed to the node module.
     fn apply_preset(&self, name: String) -> String;
     fn set_proxy(&self, config_json: String) -> String;
+    /// `[{ id, url, operator, label?, enabled?, classes? }]`; the preset becomes `custom`.
+    fn set_servers(&self, list_json: String) -> String;
+    fn clear_suspect(&self, server_id: String) -> String;
 
     /// Any named module. `request_json`: `{ recipients: [{ address, amount (zatoshis),
     /// memo? }] }` or `{ uri }`, plus `allowMixedPools?`. `{ ok, requestId }`; one open
@@ -588,6 +591,20 @@ impl ZcashWalletBackendModule for ZcashWalletBackendModuleImpl {
             return refused();
         }
         self.core_read(modules().zcash_node_module.set_proxy(&self.active(), &config_json))
+    }
+
+    fn set_servers(&self, list_json: String) -> String {
+        if !self.custodian("set_servers") {
+            return refused();
+        }
+        self.core_read(modules().zcash_node_module.set_servers(&self.active(), &list_json))
+    }
+
+    fn clear_suspect(&self, server_id: String) -> String {
+        if !self.custodian("clear_suspect") {
+            return refused();
+        }
+        self.core_read(modules().zcash_node_module.clear_suspect(&self.active(), &server_id))
     }
 
     fn prepare_send(&self, request_json: String) -> String {
