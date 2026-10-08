@@ -128,20 +128,35 @@ pub fn unwrap_core(v: &Value) -> Result<Value, String> {
     }
 }
 
-/// The node module's route table in the shape the core's jobs take: its proxy and sync
-/// servers as they are, regtest's `direct` and loopback http included.
+/// The local node's route, reached over Logos IPC.
+pub const LOCAL_NODE_URL: &str = "logos://zebrad_module";
+
+/// The node module's route table in the shape the core's jobs take: its proxy, sync servers
+/// and broadcast servers as they are, regtest's `direct` and the local node included. Only
+/// a route to a server needs the proxy.
 pub fn core_routes(table: &Value) -> Result<Value, String> {
     let t = unwrap_core(table)?;
-    let proxy = t.get("proxy").and_then(Value::as_str).filter(|p| !p.is_empty()).ok_or("no proxy is set")?;
-    let servers: Vec<String> = t
-        .get("sync")
-        .and_then(Value::as_array)
-        .map(|a| a.iter().filter_map(|s| s.get("url").and_then(Value::as_str).map(String::from)).collect())
-        .unwrap_or_default();
+    let urls = |class: &str| -> Vec<String> {
+        t.get(class)
+            .and_then(Value::as_array)
+            .map(|a| a.iter().filter_map(|s| s.get("url").and_then(Value::as_str).map(String::from)).collect())
+            .unwrap_or_default()
+    };
+    let servers = urls("sync");
     if servers.is_empty() {
         return Err("no server is enabled".into());
     }
-    Ok(json!({"proxy": proxy, "servers": servers}))
+    // An absent class means the sync servers; a present, empty one means nowhere.
+    let broadcast = t.get("broadcast").map(|_| urls("broadcast"));
+    let proxy = t.get("proxy").and_then(Value::as_str).unwrap_or("");
+    if proxy.is_empty() && servers.iter().chain(broadcast.iter().flatten()).any(|u| u != LOCAL_NODE_URL) {
+        return Err("no proxy is set".into());
+    }
+    let mut out = json!({"proxy": proxy, "servers": servers});
+    if let Some(b) = broadcast {
+        out["broadcast"] = json!(b);
+    }
+    Ok(out)
 }
 
 #[cfg(test)]
@@ -183,6 +198,15 @@ mod tests {
         assert_eq!(core_routes(&tor).unwrap(), json!({"proxy": "socks5h://127.0.0.1:9050", "servers": ["https://zec.rocks:443"]}));
         assert_eq!(core_routes(&json!({"ok": false, "error": "no proxy is set"})).unwrap_err(), "no proxy is set");
         assert_eq!(core_routes(&json!({"ok": true, "proxy": "direct", "sync": []})).unwrap_err(), "no server is enabled");
+        // The local node: reads over IPC, broadcasts over Tor, or the node alone with no proxy.
+        let local = json!({"url": LOCAL_NODE_URL});
+        let mixed = json!({"ok": true, "proxy": "socks5h://127.0.0.1:9050", "sync": [local], "broadcast": [{"url": "https://zec.rocks:443"}]});
+        assert_eq!(core_routes(&mixed).unwrap()["broadcast"], json!(["https://zec.rocks:443"]));
+        let alone = json!({"ok": true, "proxy": "", "sync": [local], "broadcast": [local]});
+        assert_eq!(core_routes(&alone).unwrap(), json!({"proxy": "", "servers": [LOCAL_NODE_URL], "broadcast": [LOCAL_NODE_URL]}));
+        let no_proxy = json!({"ok": true, "proxy": "", "sync": [local], "broadcast": [{"url": "https://zec.rocks:443"}]});
+        assert_eq!(core_routes(&no_proxy).unwrap_err(), "no proxy is set");
+        assert_eq!(core_routes(&json!({"ok": true, "proxy": "", "sync": [local], "broadcast": []})).unwrap()["broadcast"], json!([]));
     }
 
     #[test]

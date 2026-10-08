@@ -10,7 +10,7 @@ Two roles, each a set of module names. Both default to `zcash_wallet_ui`.
 
 | Role | Methods |
 |---|---|
-| custodian | `configure`, `create_wallet`, `restore_wallet`, `open_wallet`, `change_password`, `reveal_seed`, `export_viewing_key`, `set_active_network`, `apply_preset`, `set_proxy`, `set_servers`, `clear_suspect` |
+| custodian | `configure`, `create_wallet`, `restore_wallet`, `open_wallet`, `change_password`, `reveal_seed`, `export_viewing_key`, `set_active_network`, `apply_preset`, `set_proxy`, `set_servers`, `clear_suspect`, `set_local_node` |
 | approver | `approve_send`, `approve_migration` |
 | either | `close_wallet`, `new_address`, `prepare_shielding`, `prepare_migration`, `pause_migration`, `resume_migration`, `cancel_migration` |
 | any named module | `prepare_send`, and `cancel_send` for its own request |
@@ -47,10 +47,17 @@ With a `regtest.json` in this module's persistence directory, `list_networks` al
 same file in theirs. The node module's regtest routes (proxy `direct`, `http://127.0.0.1:PORT`
 servers) reach the core unchanged.
 
+## The local node
+
+With `set_local_node(true)` every read goes to the node `zebrad_module` runs in-process,
+over Logos IPC, and broadcasts stay on the servers over Tor. With no server enabled at all,
+the node broadcasts itself, over its own peer connections. `local_node()` reports whether
+it runs the active network.
+
 ## Everything else
 
 Reads (`wallet_status`, `sync_status`, `balances`, `receive_info`, `history`,
-`address_valid`, `servers`, `server_health`, `migration_status`) pass through to the engine
+`address_valid`, `servers`, `server_health`, `local_node`, `migration_status`) pass through to the engine
 or the node module. Long operations return a backend job id; poll `job_status`. Events:
 `wallet_state_changed`, `sync_progress`, `balance_changed`, `server_health_changed`,
 `send_status_changed`, `migration_changed`, `job_finished`.

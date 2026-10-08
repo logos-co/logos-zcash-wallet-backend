@@ -140,6 +140,7 @@ pub const CUSTODIAN_METHODS: &[&str] = &[
     "apply_preset",
     "set_proxy",
     "clear_suspect",
+    "set_local_node",
 ];
 
 /// Approver only: signing with the password.
