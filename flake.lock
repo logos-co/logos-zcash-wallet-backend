@@ -9790,11 +9790,11 @@
         "zebrad_module": "zebrad_module"
       },
       "locked": {
-        "lastModified": 1791460367,
-        "narHash": "sha256-zoITb102K7HGZ6G2lOPLrAm/jMOFysHuxHKFtPbdgbA=",
+        "lastModified": 1791468083,
+        "narHash": "sha256-37dlCWWFCw4CjqKWlH+ag1cAZo+/MfjUHe+9zKr02bM=",
         "owner": "logos-co",
         "repo": "logos-zcash-node-module",
-        "rev": "2f501baaa9c2b18567c412a74880f2a38e2ee5a8",
+        "rev": "2ce54e2dbe15bb702b6e8411bbe9d2d91e6fbb3f",
         "type": "github"
       },
       "original": {
@@ -9811,11 +9811,11 @@
         "zebrad_module": "zebrad_module_2"
       },
       "locked": {
-        "lastModified": 1791460334,
-        "narHash": "sha256-cIUghlqDCdSBRV3lORV1i5n+ZrLzx9H60rD3pO13f70=",
+        "lastModified": 1791468058,
+        "narHash": "sha256-m6xGgsVdlk1uDlhAsUxJuQcP/st7Kr6qcG6bU4DQ4sw=",
         "owner": "logos-co",
         "repo": "logos-zcash-wallet-core-module",
-        "rev": "e9efd355f44ec27a2e843af6849eedcf85df6739",
+        "rev": "15236a79c92720b516cd02f83a5aa59258c616f3",
         "type": "github"
       },
       "original": {
@@ -9833,11 +9833,11 @@
         "logos-zebra-nix": "logos-zebra-nix"
       },
       "locked": {
-        "lastModified": 1791460257,
-        "narHash": "sha256-h8wKw/oqwFILMcKQa+2JIEgdh457NGijBeDK6WgI7IU=",
+        "lastModified": 1791467372,
+        "narHash": "sha256-YevJL9mlH4pR9kz5sclU1yOH787J9VVEgxbzcEcCkJo=",
         "owner": "logos-co",
         "repo": "logos-zebrad-module",
-        "rev": "5b2ca97819ded59c63855815eb319d3cdb7ac105",
+        "rev": "41f1e4294d04a840af2cbd90c4b5c9bd3057a4cb",
         "type": "github"
       },
       "original": {
@@ -9855,11 +9855,11 @@
         "logos-zebra-nix": "logos-zebra-nix_2"
       },
       "locked": {
-        "lastModified": 1791460257,
-        "narHash": "sha256-h8wKw/oqwFILMcKQa+2JIEgdh457NGijBeDK6WgI7IU=",
+        "lastModified": 1791467372,
+        "narHash": "sha256-YevJL9mlH4pR9kz5sclU1yOH787J9VVEgxbzcEcCkJo=",
         "owner": "logos-co",
         "repo": "logos-zebrad-module",
-        "rev": "5b2ca97819ded59c63855815eb319d3cdb7ac105",
+        "rev": "41f1e4294d04a840af2cbd90c4b5c9bd3057a4cb",
         "type": "github"
       },
       "original": {
