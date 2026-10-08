@@ -91,9 +91,12 @@ pub trait ZcashWalletBackendModule: Send + Sync + 'static {
 
     /// The Orchard-to-Ironwood run: status, counts, ZEC migrated, paused, needs approval.
     fn migration_status(&self) -> String;
-    /// Either role. Plans a run for review: `{ ok, jobId }`; the job's result holds
-    /// `{ planId, preview }` with the schedule, the amounts made public and a digest.
-    fn prepare_migration(&self) -> String;
+    /// Either role. `choice` "private" plans the ZIP 318 run for review: `{ ok, jobId }`, whose
+    /// result holds `{ planId, preview }` with the schedule, fees, expiry, the amounts made
+    /// public and a digest. "now" moves every spendable Orchard note into Ironwood in one
+    /// transaction, the whole amount public, reviewed and approved through approve_send like a
+    /// send: `{ ok, requestId }`.
+    fn prepare_migration(&self, choice: String) -> String;
     /// APPROVER. Signs exactly the plan reviewed, checked by its digest. `{ ok, jobId }`.
     fn approve_migration(&self, plan_id: String, digest: String, password: String) -> String;
     /// Either role. `{ ok, jobId }`.
@@ -193,6 +196,21 @@ impl ZcashWalletBackendModuleImpl {
 
     /// Starts a core job and tracks it under a backend id. `params` may hold a
     /// password; it is dropped (zeroized) as soon as the core has it.
+    /// Starts a core proposal job and files it as a send request, reviewed and approved
+    /// through approve_send. One send is open at a time.
+    fn propose_as_send(&self, kind: &str, params: Zeroizing<String>) -> String {
+        let requester = caller().named().unwrap_or_default().to_string();
+        if let Some(open) = self.inner.lock().unwrap().sends.open() {
+            return err(format!("send {open} is still open"));
+        }
+        let reply = self.start_core_job(kind, params);
+        let v: Value = serde_json::from_str(&reply).unwrap_or(Value::Null);
+        let Some(jid) = v.get("jobId").and_then(Value::as_str) else { return reply };
+        let sid = self.inner.lock().unwrap().sends.add(&requester, jid);
+        emit_send_status_changed(&sid, "preparing");
+        json!({"ok": true, "requestId": sid}).to_string()
+    }
+
     fn start_core_job(&self, kind: &str, params: Zeroizing<String>) -> String {
         let reply = parse(modules().zcash_wallet_core_module.start_job(kind, &params), "wallet core");
         drop(params);
@@ -705,28 +723,22 @@ impl ZcashWalletBackendModule for ZcashWalletBackendModuleImpl {
         if !self.session("prepare_shielding") {
             return refused();
         }
-        let requester = caller().named().unwrap_or_default().to_string();
-        if let Some(open) = self.inner.lock().unwrap().sends.open() {
-            return err(format!("send {open} is still open"));
-        }
-        let params = Zeroizing::new(json!({"address": address}).to_string());
-        let reply = self.start_core_job("propose_shielding", params);
-        let v: Value = serde_json::from_str(&reply).unwrap_or(Value::Null);
-        let Some(jid) = v.get("jobId").and_then(Value::as_str) else { return reply };
-        let sid = self.inner.lock().unwrap().sends.add(&requester, jid);
-        emit_send_status_changed(&sid, "preparing");
-        json!({"ok": true, "requestId": sid}).to_string()
+        self.propose_as_send("propose_shielding", Zeroizing::new(json!({"address": address}).to_string()))
     }
 
     fn migration_status(&self) -> String {
         self.core_read(modules().zcash_wallet_core_module.migration_status())
     }
 
-    fn prepare_migration(&self) -> String {
+    fn prepare_migration(&self, choice: String) -> String {
         if !self.session("prepare_migration") {
             return refused();
         }
-        self.start_core_job("plan_migration", Zeroizing::new("{}".into()))
+        match choice.as_str() {
+            "private" => self.start_core_job("plan_migration", Zeroizing::new("{}".into())),
+            "now" => self.propose_as_send("propose_migrate_now", Zeroizing::new("{}".into())),
+            other => err(format!("unknown choice {other:?}: private or now")),
+        }
     }
 
     fn approve_migration(&self, plan_id: String, digest: String, password: String) -> String {
