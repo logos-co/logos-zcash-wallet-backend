@@ -52,6 +52,8 @@ pub trait ZcashWalletBackendModule: Send + Sync + 'static {
     fn receive_info(&self) -> String;
     /// Either role. A new diversified shielded address.
     fn new_address(&self) -> String;
+    /// The engine's history page, newest first.
+    fn history(&self, page: i64) -> String;
 
     /// The node module's view, for the active network.
     fn servers(&self) -> String;
@@ -518,6 +520,10 @@ impl ZcashWalletBackendModule for ZcashWalletBackendModuleImpl {
             return refused();
         }
         self.core_read(modules().zcash_wallet_core_module.new_address(""))
+    }
+
+    fn history(&self, page: i64) -> String {
+        self.core_read(modules().zcash_wallet_core_module.history("", page))
     }
 
     fn servers(&self) -> String {
