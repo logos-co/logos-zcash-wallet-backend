@@ -5,11 +5,11 @@
     logos-module-builder.url = "github:logos-co/logos-module-builder";
     # Dependencies follow this builder: a skewed generated ABI crashes in provider init.
     zcash_wallet_core_module = {
-      url = "git+file:///Users/dlipicar/repos/logos-zcash-wallet-core-module";
+      url = "github:logos-co/logos-zcash-wallet-core-module";
       inputs.logos-module-builder.follows = "logos-module-builder";
     };
     zcash_node_module = {
-      url = "git+file:///Users/dlipicar/repos/logos-zcash-node-module";
+      url = "github:logos-co/logos-zcash-node-module";
       inputs.logos-module-builder.follows = "logos-module-builder";
     };
   };
