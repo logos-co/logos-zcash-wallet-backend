@@ -7,8 +7,21 @@ use serde_json::{json, Value};
 
 pub const NETWORKS: &[&str] = &["mainnet", "testnet"];
 
-pub fn is_network(n: &str) -> bool {
-    NETWORKS.contains(&n)
+/// A local test chain, offered only with a `regtest.json` in the persistence directory, as
+/// the wallet core and the node module require too.
+pub const REGTEST: &str = "regtest";
+
+/// The networks on offer; `regtest` says whether a test harness enabled it.
+pub fn networks(regtest: bool) -> Vec<&'static str> {
+    let mut out = NETWORKS.to_vec();
+    if regtest {
+        out.push(REGTEST);
+    }
+    out
+}
+
+pub fn is_network(n: &str, regtest: bool) -> bool {
+    networks(regtest).contains(&n)
 }
 
 /// A core job this backend started. The UI only ever sees the backend's own id,
@@ -115,6 +128,22 @@ pub fn unwrap_core(v: &Value) -> Result<Value, String> {
     }
 }
 
+/// The node module's route table in the shape the core's jobs take: its proxy and sync
+/// servers as they are, regtest's `direct` and loopback http included.
+pub fn core_routes(table: &Value) -> Result<Value, String> {
+    let t = unwrap_core(table)?;
+    let proxy = t.get("proxy").and_then(Value::as_str).filter(|p| !p.is_empty()).ok_or("no proxy is set")?;
+    let servers: Vec<String> = t
+        .get("sync")
+        .and_then(Value::as_array)
+        .map(|a| a.iter().filter_map(|s| s.get("url").and_then(Value::as_str).map(String::from)).collect())
+        .unwrap_or_default();
+    if servers.is_empty() {
+        return Err("no server is enabled".into());
+    }
+    Ok(json!({"proxy": proxy, "servers": servers}))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -132,6 +161,28 @@ mod tests {
         assert!(parse_zec("1e3").is_err());
         assert!(parse_zec("21000001").is_err());
         assert!(parse_zec("").is_err());
+    }
+
+    #[test]
+    fn regtest_only_when_enabled() {
+        assert!(is_network("mainnet", false) && is_network("testnet", false));
+        assert!(!is_network("regtest", false) && !is_network("main", true));
+        assert!(is_network("regtest", true));
+        assert_eq!(networks(false), ["mainnet", "testnet"]);
+        assert_eq!(networks(true), ["mainnet", "testnet", "regtest"]);
+    }
+
+    #[test]
+    fn routes_pass_through_unchanged() {
+        let regtest = json!({"ok": true, "network": "regtest", "proxy": "direct", "proxyRequired": false, "crossCheck": true,
+            "sync": [{"id": "lwd0", "url": "http://127.0.0.1:29061", "operator": "a"}, {"id": "lwd1", "url": "http://127.0.0.1:29063", "operator": "b"}],
+            "tip": [{"id": "lwd0", "url": "http://127.0.0.1:29061", "operator": "a"}]});
+        let want = json!({"proxy": "direct", "servers": ["http://127.0.0.1:29061", "http://127.0.0.1:29063"]});
+        assert_eq!(core_routes(&regtest).unwrap(), want);
+        let tor = json!({"ok": true, "proxy": "socks5h://127.0.0.1:9050", "sync": [{"url": "https://zec.rocks:443"}]});
+        assert_eq!(core_routes(&tor).unwrap(), json!({"proxy": "socks5h://127.0.0.1:9050", "servers": ["https://zec.rocks:443"]}));
+        assert_eq!(core_routes(&json!({"ok": false, "error": "no proxy is set"})).unwrap_err(), "no proxy is set");
+        assert_eq!(core_routes(&json!({"ok": true, "proxy": "direct", "sync": []})).unwrap_err(), "no server is enabled");
     }
 
     #[test]

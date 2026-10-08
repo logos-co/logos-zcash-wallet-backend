@@ -10,7 +10,7 @@ Two roles, each a set of module names. Both default to `zcash_wallet_ui`.
 
 | Role | Methods |
 |---|---|
-| custodian | `configure`, `create_wallet`, `restore_wallet`, `open_wallet`, `change_password`, `reveal_seed`, `export_viewing_key`, `set_active_network`, `apply_preset`, `set_proxy` |
+| custodian | `configure`, `create_wallet`, `restore_wallet`, `open_wallet`, `change_password`, `reveal_seed`, `export_viewing_key`, `set_active_network`, `apply_preset`, `set_proxy`, `set_servers`, `clear_suspect` |
 | approver | `approve_send`, `approve_migration` |
 | either | `close_wallet`, `new_address`, `prepare_shielding`, `prepare_migration`, `pause_migration`, `resume_migration`, `cancel_migration` |
 | any named module | `prepare_send`, and `cancel_send` for its own request |
@@ -39,6 +39,13 @@ A payment that needs funds from more than one pool is refused with `needs_mixed_
 resending with `allowMixedPools: true` is the consent ZIP 315 asks for. Shielding
 (`prepare_shielding(address)`, or every eligible address with an empty address) follows
 the same review and approval.
+
+## Regtest (test harnesses)
+
+With a `regtest.json` in this module's persistence directory, `list_networks` also offers
+`regtest` and `set_active_network` takes it. The wallet core and `zcash_node_module` need the
+same file in theirs. The node module's regtest routes (proxy `direct`, `http://127.0.0.1:PORT`
+servers) reach the core unchanged.
 
 ## Everything else
 
