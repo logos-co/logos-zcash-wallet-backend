@@ -11,6 +11,9 @@ use serde::Deserialize;
 pub const DEFAULT_CUSTODIAN: &str = "zcash_wallet_ui";
 pub const DEFAULT_APPROVER: &str = "zcash_wallet_ui";
 
+/// Every refusal, byte for byte as documented; `json!` would sort the keys.
+pub const NOT_AUTHORIZED: &str = r#"{"ok":false,"error":"not authorized"}"#;
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Caller {
     Unknown,
@@ -211,6 +214,13 @@ mod tests {
         assert!(!requester_admits(&Caller::Unknown));
         assert!(requester_admits(&m("some_dapp")));
         assert!(!custodian_admits("not_a_method", &r, &m("zcash_wallet_ui")));
+    }
+
+    #[test]
+    fn refusal_is_exact() {
+        assert!(NOT_AUTHORIZED.starts_with(r#"{"ok":false,"#));
+        let v: serde_json::Value = serde_json::from_str(NOT_AUTHORIZED).unwrap();
+        assert_eq!(v, serde_json::json!({"ok": false, "error": "not authorized"}));
     }
 
     #[test]

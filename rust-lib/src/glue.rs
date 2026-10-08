@@ -138,7 +138,7 @@ impl Default for ZcashWalletBackendModuleImpl {
 }
 
 fn refused() -> String {
-    json!({"ok": false, "error": "not authorized"}).to_string()
+    gate::NOT_AUTHORIZED.into()
 }
 
 fn err(e: impl std::fmt::Display) -> String {
