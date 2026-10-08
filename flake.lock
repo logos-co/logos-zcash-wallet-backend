@@ -9737,11 +9737,11 @@
         "zebrad_module": "zebrad_module"
       },
       "locked": {
-        "lastModified": 1791468082,
+        "lastModified": 1791472927,
         "narHash": "sha256-jD+eXo29XmStPS30SRzjG9vAqbq3EjVnM/L6K2tWsGM=",
         "owner": "logos-co",
         "repo": "logos-zcash-node-module",
-        "rev": "046844f248e057eec2b6d86866ad04c8a07c3a5d",
+        "rev": "36fa80c3813190c39bbbaff50b405344a1829924",
         "type": "github"
       },
       "original": {
