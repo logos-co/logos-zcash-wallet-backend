@@ -75,9 +75,22 @@ pub trait ZcashWalletBackendModule: Send + Sync + 'static {
     fn approve_send(&self, request_id: String, password: String) -> String;
     /// The requester or an approver, until approval.
     fn cancel_send(&self, request_id: String) -> String;
-    /// Either role. Shields everything at one transparent address, which goes through
-    /// review and approve_send like a send. `{ ok, requestId }`.
+    /// Either role. Shields everything at one transparent address, or with an empty
+    /// address every address above the threshold, one transaction each; reviewed and
+    /// approved through approve_send like a send. `{ ok, requestId }`.
     fn prepare_shielding(&self, address: String) -> String;
+
+    /// The Orchard-to-Ironwood run: status, counts, ZEC migrated, paused, needs approval.
+    fn migration_status(&self) -> String;
+    /// Either role. Plans a run for review: `{ ok, jobId }`; the job's result holds
+    /// `{ planId, preview }` with the schedule, the amounts made public and a digest.
+    fn prepare_migration(&self) -> String;
+    /// APPROVER. Signs exactly the plan reviewed, checked by its digest. `{ ok, jobId }`.
+    fn approve_migration(&self, plan_id: String, digest: String, password: String) -> String;
+    /// Either role. `{ ok, jobId }`.
+    fn pause_migration(&self) -> String;
+    fn resume_migration(&self) -> String;
+    fn cancel_migration(&self) -> String;
 
     fn on_context_ready(&self, _ctx: &RustModuleContext) {}
 }
@@ -89,6 +102,7 @@ pub trait ZcashWalletBackendModuleEvents {
     fn server_health_changed(&self, payload: String);
     fn job_finished(&self, job_id: String, state: String);
     fn send_status_changed(&self, request_id: String, state: String);
+    fn migration_changed(&self, payload: String);
 }
 
 include!(concat!(env!("CARGO_MANIFEST_DIR"), "/generated/provider_gen.rs"));
@@ -352,6 +366,19 @@ fn relay_events(stop: Arc<AtomicBool>) {
                 }
                 if let Some(e) = Core::decode_balance_changed(&ev) {
                     emit_balance_changed(&e.payload);
+                }
+            }
+        });
+    }
+    if let Ok(sub) = core.on_migration_changed() {
+        let stop = stop.clone();
+        std::thread::spawn(move || {
+            for ev in sub {
+                if stop.load(Ordering::SeqCst) {
+                    break;
+                }
+                if let Some(e) = Core::decode_migration_changed(&ev) {
+                    emit_migration_changed(&e.payload);
                 }
             }
         });
@@ -642,6 +669,47 @@ impl ZcashWalletBackendModule for ZcashWalletBackendModuleImpl {
         let sid = self.inner.lock().unwrap().sends.add(&requester, jid);
         emit_send_status_changed(&sid, "preparing");
         json!({"ok": true, "requestId": sid}).to_string()
+    }
+
+    fn migration_status(&self) -> String {
+        self.core_read(modules().zcash_wallet_core_module.migration_status())
+    }
+
+    fn prepare_migration(&self) -> String {
+        if !self.session("prepare_migration") {
+            return refused();
+        }
+        self.start_core_job("plan_migration", Zeroizing::new("{}".into()))
+    }
+
+    fn approve_migration(&self, plan_id: String, digest: String, password: String) -> String {
+        let password = Zeroizing::new(password);
+        if !gate::approver_admits("approve_migration", &self.roles.lock().unwrap(), &caller()) {
+            return refused();
+        }
+        let params = Zeroizing::new(json!({"planId": plan_id, "digest": digest, "password": password.as_str()}).to_string());
+        self.start_core_job("sign_migration", params)
+    }
+
+    fn pause_migration(&self) -> String {
+        if !self.session("pause_migration") {
+            return refused();
+        }
+        self.start_core_job("pause_migration", Zeroizing::new("{}".into()))
+    }
+
+    fn resume_migration(&self) -> String {
+        if !self.session("resume_migration") {
+            return refused();
+        }
+        self.start_core_job("resume_migration", Zeroizing::new("{}".into()))
+    }
+
+    fn cancel_migration(&self) -> String {
+        if !self.session("cancel_migration") {
+            return refused();
+        }
+        self.start_core_job("cancel_migration", Zeroizing::new("{}".into()))
     }
 
     fn on_context_ready(&self, ctx: &RustModuleContext) {
