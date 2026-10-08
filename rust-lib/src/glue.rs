@@ -66,6 +66,10 @@ pub trait ZcashWalletBackendModule: Send + Sync + 'static {
     /// `[{ id, url, operator, label?, enabled?, classes? }]`; the preset becomes `custom`.
     fn set_servers(&self, list_json: String) -> String;
     fn clear_suspect(&self, server_id: String) -> String;
+    /// CUSTODIAN. Reads from the local node (zebrad_module) over IPC; broadcasts stay on Tor.
+    fn set_local_node(&self, enabled: bool) -> String;
+    /// `{ ok, enabled, available, status?, error? }` for the active network.
+    fn local_node(&self) -> String;
 
     /// Any named module. `request_json`: `{ recipients: [{ address, amount (zatoshis),
     /// memo? }] }` or `{ uri }`, plus `allowMixedPools?`. `{ ok, requestId }`; one open
@@ -598,6 +602,17 @@ impl ZcashWalletBackendModule for ZcashWalletBackendModuleImpl {
             return refused();
         }
         self.core_read(modules().zcash_node_module.set_servers(&self.active(), &list_json))
+    }
+
+    fn set_local_node(&self, enabled: bool) -> String {
+        if !self.custodian("set_local_node") {
+            return refused();
+        }
+        self.core_read(modules().zcash_node_module.set_local_node(&self.active(), enabled))
+    }
+
+    fn local_node(&self) -> String {
+        self.core_read(modules().zcash_node_module.local_node(&self.active()))
     }
 
     fn clear_suspect(&self, server_id: String) -> String {
