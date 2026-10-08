@@ -52,6 +52,8 @@ pub trait ZcashWalletBackendModule: Send + Sync + 'static {
     fn receive_info(&self) -> String;
     /// Either role. A new diversified shielded address.
     fn new_address(&self) -> String;
+    /// What kind of address `text` is on the active network, or why it is not one.
+    fn address_valid(&self, text: String) -> String;
     /// The engine's history page, newest first.
     fn history(&self, page: i64) -> String;
 
@@ -341,8 +343,25 @@ fn settle_send(sends: &mut Sends, jid: &str, kind: &str, state: &str, result: &V
 }
 
 /// Relays the core's and the node module's events under the backend's names.
-fn relay_events(stop: Arc<AtomicBool>) {
+fn relay_events(stop: Arc<AtomicBool>, inner: Arc<Mutex<Inner>>) {
+    use zcash_node_module::ZcashNodeModuleClient as Node;
     use zcash_wallet_core_module::ZcashWalletCoreModuleClient as Core;
+    let mut node = modules().zcash_node_module;
+    if let Ok(sub) = node.on_server_health_changed() {
+        let stop = stop.clone();
+        std::thread::spawn(move || {
+            for ev in sub {
+                if stop.load(Ordering::SeqCst) {
+                    break;
+                }
+                if let Some(e) = Node::decode_server_health_changed(&ev) {
+                    if e.network == inner.lock().unwrap().active {
+                        emit_server_health_changed(&e.payload);
+                    }
+                }
+            }
+        });
+    }
     let mut core = modules().zcash_wallet_core_module;
     if let Ok(sub) = core.on_sync_progress() {
         let stop = stop.clone();
@@ -553,6 +572,10 @@ impl ZcashWalletBackendModule for ZcashWalletBackendModuleImpl {
         self.core_read(modules().zcash_wallet_core_module.history("", page))
     }
 
+    fn address_valid(&self, text: String) -> String {
+        self.core_read(modules().zcash_wallet_core_module.address_valid(&text, &self.active()))
+    }
+
     fn servers(&self) -> String {
         self.core_read(modules().zcash_node_module.servers(&self.active()))
     }
@@ -731,7 +754,7 @@ impl ZcashWalletBackendModule for ZcashWalletBackendModuleImpl {
         // Calls out wait until after the host has finished wiring this module.
         let handle = std::thread::spawn(move || {
             std::thread::sleep(Duration::from_millis(500));
-            relay_events(stop.clone());
+            relay_events(stop.clone(), inner.clone());
             reactor(inner, stop);
         });
         *self.reactor.lock().unwrap() = Some(handle);
