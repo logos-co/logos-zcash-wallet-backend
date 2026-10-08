@@ -9683,11 +9683,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1791418526,
-        "narHash": "sha256-6vr5Ca66GokPtV/TdOnsCu+5evOjFIeqYX+uHqHRcI8=",
+        "lastModified": 1791419869,
+        "narHash": "sha256-QFejI5ImfS2sqCWBsELAwNJjzdcRRgwhBEdCHv0jocs=",
         "ref": "refs/heads/master",
-        "rev": "4ca6fa9853ce7b67733d1af167a1f234b77c063e",
-        "revCount": 2,
+        "rev": "6383d022c546a3ec5e53c5ae10bfb8f23c3c3f3a",
+        "revCount": 3,
         "type": "git",
         "url": "file:///Users/dlipicar/repos/logos-zcash-node-module"
       },
@@ -9703,11 +9703,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1791419106,
-        "narHash": "sha256-jdT0qkNjkBfPeEZH9VLfjzOIrvt3vT9nSkIzxf7uDtk=",
+        "lastModified": 1791419856,
+        "narHash": "sha256-J7n4/rzQ9Qjh9pvn6p44dhJAkQt7IR1Uoo5gCojm1vc=",
         "ref": "refs/heads/master",
-        "rev": "8a23b9cd18a72d6f4c3780a2dae9239efc0e7899",
-        "revCount": 14,
+        "rev": "b6168dbe1bd309d989ed4bf576b4e7eed7739ce9",
+        "revCount": 17,
         "type": "git",
         "url": "file:///Users/dlipicar/repos/logos-zcash-wallet-core-module"
       },
