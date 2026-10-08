@@ -73,6 +73,9 @@ pub trait ZcashWalletBackendModule: Send + Sync + 'static {
     fn approve_send(&self, request_id: String, password: String) -> String;
     /// The requester or an approver, until approval.
     fn cancel_send(&self, request_id: String) -> String;
+    /// Either role. Shields everything at one transparent address, which goes through
+    /// review and approve_send like a send. `{ ok, requestId }`.
+    fn prepare_shielding(&self, address: String) -> String;
 
     fn on_context_ready(&self, _ctx: &RustModuleContext) {}
 }
@@ -293,7 +296,7 @@ fn settle_send(sends: &mut Sends, jid: &str, kind: &str, state: &str, result: &V
     let (sid, s) = sends.map.iter_mut().find(|(_, s)| s.job.as_deref() == Some(jid))?;
     s.job = None;
     match (kind, state) {
-        ("propose", "done") => {
+        ("propose" | "propose_shielding", "done") => {
             s.state = "previewed".into();
             s.previewed_at = Some(std::time::Instant::now());
             s.proposal_id = result.get("proposalId").and_then(Value::as_str).unwrap_or_default().into();
@@ -616,6 +619,23 @@ impl ZcashWalletBackendModule for ZcashWalletBackendModuleImpl {
         drop(g);
         emit_send_status_changed(&request_id, "cancelled");
         json!({"ok": true, "requestId": request_id}).to_string()
+    }
+
+    fn prepare_shielding(&self, address: String) -> String {
+        if !self.session("prepare_shielding") {
+            return refused();
+        }
+        let requester = caller().named().unwrap_or_default().to_string();
+        if let Some(open) = self.inner.lock().unwrap().sends.open() {
+            return err(format!("send {open} is still open"));
+        }
+        let params = Zeroizing::new(json!({"address": address}).to_string());
+        let reply = self.start_core_job("propose_shielding", params);
+        let v: Value = serde_json::from_str(&reply).unwrap_or(Value::Null);
+        let Some(jid) = v.get("jobId").and_then(Value::as_str) else { return reply };
+        let sid = self.inner.lock().unwrap().sends.add(&requester, jid);
+        emit_send_status_changed(&sid, "preparing");
+        json!({"ok": true, "requestId": sid}).to_string()
     }
 
     fn on_context_ready(&self, ctx: &RustModuleContext) {
