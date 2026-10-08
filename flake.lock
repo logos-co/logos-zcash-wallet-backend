@@ -9790,11 +9790,11 @@
         "zebrad_module": "zebrad_module"
       },
       "locked": {
-        "lastModified": 1791472979,
+        "lastModified": 1791479609,
         "narHash": "sha256-37dlCWWFCw4CjqKWlH+ag1cAZo+/MfjUHe+9zKr02bM=",
         "owner": "logos-co",
         "repo": "logos-zcash-node-module",
-        "rev": "aad8f321ae858af17faa924b32c952dee26a0241",
+        "rev": "1f2b701575e2084dacc2a019183591c5212a00a7",
         "type": "github"
       },
       "original": {
@@ -9811,11 +9811,11 @@
         "zebrad_module": "zebrad_module_2"
       },
       "locked": {
-        "lastModified": 1791472977,
+        "lastModified": 1791479612,
         "narHash": "sha256-m6xGgsVdlk1uDlhAsUxJuQcP/st7Kr6qcG6bU4DQ4sw=",
         "owner": "logos-co",
         "repo": "logos-zcash-wallet-core-module",
-        "rev": "367c6d8d4fd771b76243d3731360308713e711ef",
+        "rev": "6bdf4b9c1f674eab2da5b9cb47878b72216330d9",
         "type": "github"
       },
       "original": {
