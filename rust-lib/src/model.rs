@@ -156,6 +156,10 @@ pub fn core_routes(table: &Value) -> Result<Value, String> {
     if let Some(b) = broadcast {
         out["broadcast"] = json!(b);
     }
+    // Servers the user set to skip Tor: the core reaches them without the proxy.
+    if let Some(d) = t.get("direct").and_then(Value::as_array).filter(|d| !d.is_empty()) {
+        out["direct"] = json!(d);
+    }
     Ok(out)
 }
 
@@ -207,6 +211,12 @@ mod tests {
         let no_proxy = json!({"ok": true, "proxy": "", "sync": [local], "broadcast": [{"url": "https://zec.rocks:443"}]});
         assert_eq!(core_routes(&no_proxy).unwrap_err(), "no proxy is set");
         assert_eq!(core_routes(&json!({"ok": true, "proxy": "", "sync": [local], "broadcast": []})).unwrap()["broadcast"], json!([]));
+        // Servers the user set to skip Tor go along; an empty list stays out.
+        let some = json!({"ok": true, "proxy": "socks5h://127.0.0.1:9050", "sync": [{"url": "https://zec.rocks:443"}],
+                          "direct": ["https://zec.rocks:443"]});
+        assert_eq!(core_routes(&some).unwrap()["direct"], json!(["https://zec.rocks:443"]));
+        let none = json!({"ok": true, "proxy": "socks5h://127.0.0.1:9050", "sync": [{"url": "https://zec.rocks:443"}], "direct": []});
+        assert!(core_routes(&none).unwrap().get("direct").is_none());
     }
 
     #[test]

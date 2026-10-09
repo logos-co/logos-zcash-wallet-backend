@@ -47,6 +47,12 @@ With a `regtest.json` in this module's persistence directory, `list_networks` al
 same file in theirs. The node module's regtest routes (proxy `direct`, `http://127.0.0.1:PORT`
 servers) reach the core unchanged.
 
+## Routes
+
+The backend hands the wallet core the node module's routes: the proxy, the sync and broadcast
+servers, and `direct`, the servers the user set to skip Tor. Servers on the user's own network
+need no proxy either. A route table that still needs a proxy, with none set, is refused.
+
 ## The local node
 
 With `set_local_node(true)` every read goes to the node `zebrad_module` runs in-process,
