@@ -1,7 +1,8 @@
-//! Backend state that needs no Logos: tracked core jobs, the active network, and
-//! amount formatting.
+//! Backend state that needs no Logos: tracked core jobs, the active network, which
+//! network's servers are checked, and amount formatting.
 
 use std::collections::HashMap;
+use std::time::{Duration, Instant};
 
 use serde_json::{json, Value};
 
@@ -328,5 +329,102 @@ mod send_tests {
         e.previewed_at = Some(std::time::Instant::now() - std::time::Duration::from_secs(PREVIEW_TTL_SECS + 1));
         assert_eq!(s.expire(), vec![id.clone()]);
         assert_eq!(s.status(&id)["state"], "expired");
+    }
+}
+
+/// How long `watch_servers(true)` lasts: the app renews it while it shows the servers.
+pub const SHOWN_SECS: u64 = 180;
+/// The wait before asking a module that did not answer again.
+pub const RETRY_SECS: u64 = 5;
+
+/// Which network's servers the node module checks: the open wallet's; with none open, the
+/// active network's while the app shows its servers; otherwise none.
+#[derive(Default)]
+pub struct Watch {
+    /// The open wallet's network, if one is open.
+    wallet: Option<String>,
+    /// Whether the core's wallet status has been read or reported yet.
+    pub known: bool,
+    shown_until: Option<Instant>,
+    /// What the node module last took.
+    taken: Option<String>,
+    retry_at: Option<Instant>,
+}
+
+impl Watch {
+    /// From a wallet status, `{ open, network }`, read or as `wallet_state_changed` carries it.
+    pub fn set_wallet(&mut self, status: &str) {
+        let v: Value = serde_json::from_str(status).unwrap_or_default();
+        self.wallet = (v["open"] == true).then(|| v["network"].as_str().unwrap_or_default().to_string());
+        self.known = true;
+    }
+
+    pub fn show(&mut self, on: bool, now: Instant) {
+        self.shown_until = on.then(|| now + Duration::from_secs(SHOWN_SECS));
+    }
+
+    /// The network whose servers to check now; "" for none.
+    pub fn target(&self, active: &str, now: Instant) -> String {
+        match &self.wallet {
+            Some(n) => n.clone(),
+            None if self.shown_until.is_some_and(|t| now < t) => active.into(),
+            None => String::new(),
+        }
+    }
+
+    pub fn may_try(&self, now: Instant) -> bool {
+        self.retry_at.map_or(true, |t| now >= t)
+    }
+
+    /// The target, if the node module does not have it yet and may be asked now.
+    pub fn due(&self, active: &str, now: Instant) -> Option<String> {
+        let t = self.target(active, now);
+        (self.may_try(now) && self.taken.as_deref() != Some(t.as_str())).then_some(t)
+    }
+
+    pub fn took(&mut self, network: String) {
+        self.taken = Some(network);
+        self.retry_at = None;
+    }
+
+    /// The core or the node module did not answer.
+    pub fn missed(&mut self, now: Instant) {
+        self.retry_at = Some(now + Duration::from_secs(RETRY_SECS));
+    }
+}
+
+#[cfg(test)]
+mod watch_tests {
+    use super::*;
+
+    #[test]
+    fn the_open_wallet_or_the_shown_servers() {
+        let (mut w, now) = (Watch::default(), Instant::now());
+        // No wallet open and the servers not shown: none is checked.
+        assert_eq!(w.target("testnet", now), "");
+        w.show(true, now);
+        assert_eq!(w.target("testnet", now), "testnet");
+        // Showing ends by itself unless the app renews it.
+        assert_eq!(w.target("testnet", now + Duration::from_secs(SHOWN_SECS)), "");
+        w.set_wallet(r#"{"open": true, "network": "regtest"}"#);
+        assert_eq!(w.target("testnet", now), "regtest");
+        w.show(false, now);
+        assert_eq!(w.target("testnet", now), "regtest");
+        w.set_wallet(r#"{"open": false}"#);
+        assert_eq!(w.target("testnet", now), "");
+    }
+
+    #[test]
+    fn asked_until_taken_and_not_too_often() {
+        let (mut w, now) = (Watch::default(), Instant::now());
+        assert_eq!(w.due("mainnet", now).as_deref(), Some(""));
+        w.missed(now);
+        assert_eq!(w.due("mainnet", now), None);
+        let later = now + Duration::from_secs(RETRY_SECS);
+        assert_eq!(w.due("mainnet", later).as_deref(), Some(""));
+        w.took(String::new());
+        assert_eq!(w.due("mainnet", later), None);
+        w.show(true, later);
+        assert_eq!(w.due("mainnet", later).as_deref(), Some("mainnet"));
     }
 }

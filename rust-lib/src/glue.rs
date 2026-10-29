@@ -8,14 +8,14 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread::JoinHandle;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use logos_rust_sdk::{AboutToUnload, LogosCaller, Shutdown};
 use serde_json::{json, Value};
 use zeroize::Zeroizing;
 
 use crate::gate::{self, Caller, Roles};
-use crate::model::{core_routes, is_network, networks, unwrap_core, Jobs, Sends};
+use crate::model::{core_routes, is_network, networks, unwrap_core, Jobs, Sends, Watch};
 
 pub trait ZcashWalletBackendModule: Send + Sync + 'static {
     /// CUSTODIAN. Replaces both roles: `{ approvers?, custodians? }`. Total, and saved.
@@ -66,6 +66,9 @@ pub trait ZcashWalletBackendModule: Send + Sync + 'static {
     /// `[{ id, url, operator, label?, enabled?, classes? }]`; the preset becomes `custom`.
     fn set_servers(&self, list_json: String) -> String;
     fn clear_suspect(&self, server_id: String) -> String;
+    /// CUSTODIAN. The app shows the servers (renewed within 3 minutes) or no longer. With no
+    /// wallet open, the active network's servers are checked only while it does.
+    fn watch_servers(&self, on: bool) -> String;
     /// CUSTODIAN. Reads from the local node (zebrad_module) over IPC; broadcasts stay on Tor.
     fn set_local_node(&self, enabled: bool) -> String;
     /// `{ ok, enabled, available, status?, error? }` for the active network.
@@ -127,6 +130,7 @@ struct Inner {
     dir: Option<PathBuf>,
     /// A test harness put `regtest.json` in the persistence directory.
     regtest: bool,
+    watch: Watch,
 }
 
 pub struct ZcashWalletBackendModuleImpl {
@@ -321,6 +325,7 @@ fn reactor(inner: Arc<Mutex<Inner>>, stop: Arc<AtomicBool>) {
         for sid in expired {
             emit_send_status_changed(&sid, "expired");
         }
+        sync_watch(&inner);
         std::thread::sleep(Duration::from_millis(500));
     }
 }
@@ -358,12 +363,41 @@ fn settle_send(sends: &mut Sends, jid: &str, kind: &str, state: &str, result: &V
     Some((sid.clone(), s.state.clone()))
 }
 
-/// Tells the node module which network a wallet is open on (wallet_status()'s shape), so
-/// only that network's servers are checked; none while no wallet is open.
-fn watch_for(status: &str) {
-    let v: Value = serde_json::from_str(status).unwrap_or_default();
-    let network = if v["open"] == true { v["network"].as_str().unwrap_or_default() } else { "" };
-    let _ = modules().zcash_node_module.watch(network);
+/// Tells the node module whose servers to check (model::Watch). Only the reactor calls it, and
+/// it asks again every few seconds while the core or the node module does not answer.
+fn sync_watch(inner: &Mutex<Inner>) {
+    let now = Instant::now();
+    let (known, may_try) = {
+        let g = inner.lock().unwrap();
+        (g.watch.known, g.watch.may_try(now))
+    };
+    if !may_try {
+        return;
+    }
+    if !known {
+        match modules().zcash_wallet_core_module.wallet_status() {
+            Ok(status) => {
+                let mut g = inner.lock().unwrap();
+                // A wallet_state_changed that came meanwhile is newer.
+                if !g.watch.known {
+                    g.watch.set_wallet(&status);
+                }
+            }
+            Err(_) => return inner.lock().unwrap().watch.missed(now),
+        }
+    }
+    let due = {
+        let g = inner.lock().unwrap();
+        g.watch.due(&g.active, now)
+    };
+    let Some(network) = due else { return };
+    let took = parse(modules().zcash_node_module.watch(&network), "node module").is_ok_and(|v| v["ok"] == true);
+    let mut g = inner.lock().unwrap();
+    if took {
+        g.watch.took(network);
+    } else {
+        g.watch.missed(now);
+    }
 }
 
 /// Relays the core's and the node module's events under the backend's names.
@@ -372,7 +406,7 @@ fn relay_events(stop: Arc<AtomicBool>, inner: Arc<Mutex<Inner>>) {
     use zcash_wallet_core_module::ZcashWalletCoreModuleClient as Core;
     let mut node = modules().zcash_node_module;
     if let Ok(sub) = node.on_server_health_changed() {
-        let stop = stop.clone();
+        let (stop, inner) = (stop.clone(), inner.clone());
         std::thread::spawn(move || {
             for ev in sub {
                 if stop.load(Ordering::SeqCst) {
@@ -434,7 +468,7 @@ fn relay_events(stop: Arc<AtomicBool>, inner: Arc<Mutex<Inner>>) {
                 }
                 if let Some(e) = Core::decode_wallet_state_changed(&ev) {
                     emit_wallet_state_changed(&e.payload);
-                    watch_for(&e.payload);
+                    inner.lock().unwrap().watch.set_wallet(&e.payload);
                 }
             }
         });
@@ -649,6 +683,15 @@ impl ZcashWalletBackendModule for ZcashWalletBackendModuleImpl {
         self.core_read(modules().zcash_node_module.clear_suspect(&self.active(), &server_id))
     }
 
+    fn watch_servers(&self, on: bool) -> String {
+        if !self.custodian("watch_servers") {
+            return refused();
+        }
+        // The reactor passes it on to the node module.
+        self.inner.lock().unwrap().watch.show(on, Instant::now());
+        json!({"ok": true}).to_string()
+    }
+
     fn prepare_send(&self, request_json: String) -> String {
         let caller = caller();
         let Some(requester) = caller.named().map(String::from) else { return refused() };
@@ -802,9 +845,6 @@ impl ZcashWalletBackendModule for ZcashWalletBackendModuleImpl {
         let handle = std::thread::spawn(move || {
             std::thread::sleep(Duration::from_millis(500));
             relay_events(stop.clone(), inner.clone());
-            if let Ok(status) = modules().zcash_wallet_core_module.wallet_status() {
-                watch_for(&status);
-            }
             reactor(inner, stop);
         });
         *self.reactor.lock().unwrap() = Some(handle);
