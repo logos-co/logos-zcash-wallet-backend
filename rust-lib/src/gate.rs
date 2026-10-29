@@ -140,6 +140,7 @@ pub const CUSTODIAN_METHODS: &[&str] = &[
     "apply_preset",
     "set_proxy",
     "clear_suspect",
+    "watch_servers",
     "set_local_node",
 ];
 
@@ -221,7 +222,7 @@ mod tests {
     fn server_settings_need_the_custodian() {
         let mut r = Roles::default();
         r.configure(r#"{"approvers": ["zcash_wallet_cli"], "custodians": ["zcash_wallet_ui"]}"#).unwrap();
-        for method in ["set_servers", "clear_suspect"] {
+        for method in ["set_servers", "clear_suspect", "watch_servers"] {
             assert!(custodian_admits(method, &r, &m("zcash_wallet_ui")), "{method}");
             for who in [m("zcash_wallet_cli"), m("some_dapp"), Caller::HostAnchor, Caller::Unknown] {
                 assert!(!custodian_admits(method, &r, &who), "{method} {who:?}");

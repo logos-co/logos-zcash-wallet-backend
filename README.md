@@ -10,7 +10,7 @@ Two roles, each a set of module names. Both default to `zcash_wallet_ui`.
 
 | Role | Methods |
 |---|---|
-| custodian | `configure`, `create_wallet`, `restore_wallet`, `open_wallet`, `change_password`, `reveal_seed`, `export_viewing_key`, `set_active_network`, `apply_preset`, `set_proxy`, `set_servers`, `clear_suspect`, `set_local_node` |
+| custodian | `configure`, `create_wallet`, `restore_wallet`, `open_wallet`, `change_password`, `reveal_seed`, `export_viewing_key`, `set_active_network`, `apply_preset`, `set_proxy`, `set_servers`, `clear_suspect`, `watch_servers`, `set_local_node` |
 | approver | `approve_send`, `approve_migration` |
 | either | `close_wallet`, `new_address`, `prepare_shielding`, `prepare_migration`, `pause_migration`, `resume_migration`, `cancel_migration` |
 | any named module | `prepare_send`, and `cancel_send` for its own request |
@@ -53,8 +53,9 @@ The backend hands the wallet core the node module's routes: the proxy, the sync 
 servers, and `direct`, the servers the user set to skip Tor. Servers on the user's own network
 need no proxy either. A route table that still needs a proxy, with none set, is refused.
 
-As a wallet opens or closes, the backend tells the node module which network to watch
-(`watch`): only that network's servers get health checks, and none while no wallet is open.
+The backend tells the node module whose servers to check (`watch`): the open wallet's
+network's; with no wallet open, the active network's while the app shows them
+(`watch_servers(true)`, which lasts 3 minutes unless renewed); otherwise none.
 
 ## The local node
 
