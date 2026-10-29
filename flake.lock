@@ -9790,11 +9790,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1793125142,
-        "narHash": "sha256-6wCWOY89POswB9derweSl8b3vVbm681F58MjItO7Yt4=",
+        "lastModified": 1793233167,
+        "narHash": "sha256-PTDOQMk3JS8snEErsGS2cW6l+DspDoQt/G219Z/pnWg=",
         "owner": "logos-co",
         "repo": "logos-tor-module",
-        "rev": "507251e17d56d8e86539cb5d614cb8b593464209",
+        "rev": "6fba1edd753758930ce0cbc9a854be7863fd35e0",
         "type": "github"
       },
       "original": {
@@ -9812,11 +9812,11 @@
         "zebrad_module": "zebrad_module"
       },
       "locked": {
-        "lastModified": 1793226309,
-        "narHash": "sha256-5frA4iqldq3g7db8uXOl4FupsRhUZFymmU8/ijSKZ9A=",
+        "lastModified": 1793236001,
+        "narHash": "sha256-Mqmq3eSU8/bb23yaOz7XdZWIGZ65+ILXZ92VvxEV5mo=",
         "owner": "logos-co",
         "repo": "logos-zcash-node-module",
-        "rev": "1c8e757613c3f38d9bc629aadad912081d37f713",
+        "rev": "1f441249ef5c4533d6b9134607195486df15c77d",
         "type": "github"
       },
       "original": {
