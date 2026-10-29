@@ -358,6 +358,14 @@ fn settle_send(sends: &mut Sends, jid: &str, kind: &str, state: &str, result: &V
     Some((sid.clone(), s.state.clone()))
 }
 
+/// Tells the node module which network a wallet is open on (wallet_status()'s shape), so
+/// only that network's servers are checked; none while no wallet is open.
+fn watch_for(status: &str) {
+    let v: Value = serde_json::from_str(status).unwrap_or_default();
+    let network = if v["open"] == true { v["network"].as_str().unwrap_or_default() } else { "" };
+    let _ = modules().zcash_node_module.watch(network);
+}
+
 /// Relays the core's and the node module's events under the backend's names.
 fn relay_events(stop: Arc<AtomicBool>, inner: Arc<Mutex<Inner>>) {
     use zcash_node_module::ZcashNodeModuleClient as Node;
@@ -426,6 +434,7 @@ fn relay_events(stop: Arc<AtomicBool>, inner: Arc<Mutex<Inner>>) {
                 }
                 if let Some(e) = Core::decode_wallet_state_changed(&ev) {
                     emit_wallet_state_changed(&e.payload);
+                    watch_for(&e.payload);
                 }
             }
         });
@@ -793,6 +802,9 @@ impl ZcashWalletBackendModule for ZcashWalletBackendModuleImpl {
         let handle = std::thread::spawn(move || {
             std::thread::sleep(Duration::from_millis(500));
             relay_events(stop.clone(), inner.clone());
+            if let Ok(status) = modules().zcash_wallet_core_module.wallet_status() {
+                watch_for(&status);
+            }
             reactor(inner, stop);
         });
         *self.reactor.lock().unwrap() = Some(handle);

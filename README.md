@@ -53,6 +53,9 @@ The backend hands the wallet core the node module's routes: the proxy, the sync 
 servers, and `direct`, the servers the user set to skip Tor. Servers on the user's own network
 need no proxy either. A route table that still needs a proxy, with none set, is refused.
 
+As a wallet opens or closes, the backend tells the node module which network to watch
+(`watch`): only that network's servers get health checks, and none while no wallet is open.
+
 ## The local node
 
 With `set_local_node(true)` every read goes to the node `zebrad_module` runs in-process,

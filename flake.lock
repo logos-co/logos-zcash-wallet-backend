@@ -9782,19 +9782,41 @@
         "type": "github"
       }
     },
+    "tor_module": {
+      "inputs": {
+        "logos-module-builder": [
+          "zcash_node_module",
+          "logos-module-builder"
+        ]
+      },
+      "locked": {
+        "lastModified": 1793233167,
+        "narHash": "sha256-PTDOQMk3JS8snEErsGS2cW6l+DspDoQt/G219Z/pnWg=",
+        "owner": "logos-co",
+        "repo": "logos-tor-module",
+        "rev": "6fba1edd753758930ce0cbc9a854be7863fd35e0",
+        "type": "github"
+      },
+      "original": {
+        "owner": "logos-co",
+        "repo": "logos-tor-module",
+        "type": "github"
+      }
+    },
     "zcash_node_module": {
       "inputs": {
         "logos-module-builder": [
           "logos-module-builder"
         ],
+        "tor_module": "tor_module",
         "zebrad_module": "zebrad_module"
       },
       "locked": {
-        "lastModified": 1791479609,
-        "narHash": "sha256-37dlCWWFCw4CjqKWlH+ag1cAZo+/MfjUHe+9zKr02bM=",
+        "lastModified": 1793236001,
+        "narHash": "sha256-Mqmq3eSU8/bb23yaOz7XdZWIGZ65+ILXZ92VvxEV5mo=",
         "owner": "logos-co",
         "repo": "logos-zcash-node-module",
-        "rev": "1f2b701575e2084dacc2a019183591c5212a00a7",
+        "rev": "1f441249ef5c4533d6b9134607195486df15c77d",
         "type": "github"
       },
       "original": {
