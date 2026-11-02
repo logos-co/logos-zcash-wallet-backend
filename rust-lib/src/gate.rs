@@ -142,6 +142,7 @@ pub const CUSTODIAN_METHODS: &[&str] = &[
     "clear_suspect",
     "watch_servers",
     "set_local_node",
+    "set_tor_use",
 ];
 
 /// Approver only: signing with the password.

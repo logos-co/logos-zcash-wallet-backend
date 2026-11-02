@@ -161,6 +161,24 @@ pub fn core_routes(table: &Value) -> Result<Value, String> {
     if let Some(d) = t.get("direct").and_then(Value::as_array).filter(|d| !d.is_empty()) {
         out["direct"] = json!(d);
     }
+    // Tor for what identifies you: the classes that go direct, where lookups go, and who runs each server.
+    if let Some(d) = t.get("directFor").and_then(Value::as_array).filter(|d| !d.is_empty()) {
+        out["directFor"] = json!(d);
+        for class in ["details", "taddr"] {
+            if t.get(class).is_some() {
+                out[class] = json!(urls(class));
+            }
+        }
+        let mut operators = serde_json::Map::new();
+        for class in ["sync", "tip", "details", "taddr", "broadcast", "mempool"] {
+            for r in t.get(class).and_then(Value::as_array).into_iter().flatten() {
+                if let (Some(url), Some(op)) = (r.get("url").and_then(Value::as_str), r.get("operator").and_then(Value::as_str)) {
+                    operators.insert(url.into(), json!(op));
+                }
+            }
+        }
+        out["operators"] = Value::Object(operators);
+    }
     Ok(out)
 }
 
@@ -218,6 +236,25 @@ mod tests {
         assert_eq!(core_routes(&some).unwrap()["direct"], json!(["https://zec.rocks:443"]));
         let none = json!({"ok": true, "proxy": "socks5h://127.0.0.1:9050", "sync": [{"url": "https://zec.rocks:443"}], "direct": []});
         assert!(core_routes(&none).unwrap().get("direct").is_none());
+    }
+
+    #[test]
+    fn identifying_routes_carry_classes_lookups_and_operators() {
+        let (a, b) = (json!({"url": "https://a.example:443", "operator": "A"}), json!({"url": "https://b.example:443", "operator": "B"}));
+        let table = json!({"ok": true, "proxy": "tor", "torUse": "identifying", "directFor": ["sync", "tip"],
+            "sync": [a, b], "tip": [a], "details": [b], "taddr": [a, b], "broadcast": [b, a], "direct": []});
+        assert_eq!(
+            core_routes(&table).unwrap(),
+            json!({"proxy": "tor", "servers": ["https://a.example:443", "https://b.example:443"],
+                   "broadcast": ["https://b.example:443", "https://a.example:443"], "directFor": ["sync", "tip"],
+                   "details": ["https://b.example:443"], "taddr": ["https://a.example:443", "https://b.example:443"],
+                   "operators": {"https://a.example:443": "A", "https://b.example:443": "B"}})
+        );
+        // Everything over Tor, or nothing: the older shape, which any core reads.
+        for mode in ["all", "none"] {
+            let t = json!({"ok": true, "proxy": "tor", "torUse": mode, "directFor": [], "sync": [a], "details": [a], "taddr": [a]});
+            assert_eq!(core_routes(&t).unwrap(), json!({"proxy": "tor", "servers": ["https://a.example:443"]}));
+        }
     }
 
     #[test]
@@ -349,6 +386,8 @@ pub struct Watch {
     /// What the node module last took.
     taken: Option<String>,
     retry_at: Option<Instant>,
+    /// The open wallet's network as the node module last heard it, which locks Use Tor for.
+    told_open: Option<Option<String>>,
 }
 
 impl Watch {
@@ -391,6 +430,29 @@ impl Watch {
     pub fn missed(&mut self, now: Instant) {
         self.retry_at = Some(now + Duration::from_secs(RETRY_SECS));
     }
+
+    /// The `set_wallet_open(network, open)` calls that bring the node module up to date. The
+    /// first time, every other network is closed too: the node may have outlived a backend.
+    pub fn open_calls(&self, networks: &[&str]) -> Vec<(String, bool)> {
+        if !self.known || self.told_open.as_ref() == Some(&self.wallet) {
+            return Vec::new();
+        }
+        let closed: Vec<String> = match &self.told_open {
+            None => networks.iter().map(|n| n.to_string()).collect(),
+            Some(was) => was.iter().cloned().collect(),
+        };
+        let mut calls: Vec<(String, bool)> = closed.into_iter().filter(|n| Some(n) != self.wallet.as_ref()).map(|n| (n, false)).collect();
+        calls.extend(self.wallet.iter().map(|n| (n.clone(), true)));
+        calls
+    }
+
+    pub fn open_wallet(&self) -> Option<String> {
+        self.wallet.clone()
+    }
+
+    pub fn told_open(&mut self, wallet: Option<String>) {
+        self.told_open = Some(wallet);
+    }
 }
 
 #[cfg(test)]
@@ -412,6 +474,29 @@ mod watch_tests {
         assert_eq!(w.target("testnet", now), "regtest");
         w.set_wallet(r#"{"open": false}"#);
         assert_eq!(w.target("testnet", now), "");
+    }
+
+    #[test]
+    fn the_node_hears_which_wallet_is_open() {
+        let mut w = Watch::default();
+        let nets = ["mainnet", "testnet"];
+        assert_eq!(w.open_calls(&nets), [], "nothing until the wallet status is known");
+        w.set_wallet(r#"{"open": false}"#);
+        assert_eq!(w.open_calls(&nets), [("mainnet".into(), false), ("testnet".into(), false)]);
+        w.told_open(w.open_wallet());
+        assert_eq!(w.open_calls(&nets), []);
+        w.set_wallet(r#"{"open": true, "network": "testnet"}"#);
+        assert_eq!(w.open_calls(&nets), [("testnet".into(), true)]);
+        w.told_open(w.open_wallet());
+        w.set_wallet(r#"{"open": true, "network": "mainnet"}"#);
+        assert_eq!(w.open_calls(&nets), [("testnet".into(), false), ("mainnet".into(), true)]);
+        w.told_open(w.open_wallet());
+        w.set_wallet(r#"{"open": false}"#);
+        assert_eq!(w.open_calls(&nets), [("mainnet".into(), false)]);
+        // A backend that starts with a wallet already open.
+        let mut fresh = Watch::default();
+        fresh.set_wallet(r#"{"open": true, "network": "testnet"}"#);
+        assert_eq!(fresh.open_calls(&nets), [("mainnet".into(), false), ("testnet".into(), true)]);
     }
 
     #[test]

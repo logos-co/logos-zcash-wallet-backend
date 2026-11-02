@@ -73,6 +73,11 @@ pub trait ZcashWalletBackendModule: Send + Sync + 'static {
     fn set_local_node(&self, enabled: bool) -> String;
     /// `{ ok, enabled, available, status?, error? }` for the active network.
     fn local_node(&self) -> String;
+    /// CUSTODIAN. What goes through Tor on every network: `all`, `identifying` or `none`.
+    /// Refused while a wallet is open or opening.
+    fn set_tor_use(&self, mode: String) -> String;
+    /// `{ ok, torUse, torUseChosen, torUseMigrated }`, from the node module.
+    fn tor_use(&self) -> String;
 
     /// Any named module. `request_json`: `{ recipients: [{ address, amount (zatoshis),
     /// memo? }] }` or `{ uri }`, plus `allowMixedPools?`. `{ ok, requestId }`; one open
@@ -138,6 +143,8 @@ pub struct ZcashWalletBackendModuleImpl {
     roles: Mutex<Roles>,
     stop: Arc<AtomicBool>,
     reactor: Mutex<Option<JoinHandle<()>>>,
+    /// Held while a wallet job takes its routes and while Use Tor for changes.
+    routing: Mutex<()>,
 }
 
 impl Default for ZcashWalletBackendModuleImpl {
@@ -147,6 +154,7 @@ impl Default for ZcashWalletBackendModuleImpl {
             roles: Mutex::new(Roles::default()),
             stop: Arc::new(AtomicBool::new(false)),
             reactor: Mutex::new(None),
+            routing: Mutex::new(()),
         }
     }
 }
@@ -230,6 +238,7 @@ impl ZcashWalletBackendModuleImpl {
     }
 
     fn wallet_job(&self, kind: &str, name: &str, password: Option<Zeroizing<String>>, extra: Value) -> String {
+        let _routing = self.routing.lock().unwrap();
         let network = self.active();
         let routes = match self.routes(&network) {
             Ok(r) => r,
@@ -326,6 +335,7 @@ fn reactor(inner: Arc<Mutex<Inner>>, stop: Arc<AtomicBool>) {
             emit_send_status_changed(&sid, "expired");
         }
         sync_watch(&inner);
+        sync_open(&inner);
         std::thread::sleep(Duration::from_millis(500));
     }
 }
@@ -398,6 +408,27 @@ fn sync_watch(inner: &Mutex<Inner>) {
     } else {
         g.watch.missed(now);
     }
+}
+
+/// Tells the node module which wallet is open, which locks Use Tor for (model::Watch).
+fn sync_open(inner: &Mutex<Inner>) {
+    let now = Instant::now();
+    let (calls, wallet) = {
+        let g = inner.lock().unwrap();
+        if !g.watch.may_try(now) {
+            return;
+        }
+        (g.watch.open_calls(&networks(g.regtest)), g.watch.open_wallet())
+    };
+    if calls.is_empty() {
+        return;
+    }
+    for (network, open) in calls {
+        if !parse(modules().zcash_node_module.set_wallet_open(&network, open), "node module").is_ok_and(|v| v["ok"] == true) {
+            return inner.lock().unwrap().watch.missed(now);
+        }
+    }
+    inner.lock().unwrap().watch.told_open(wallet);
 }
 
 /// Relays the core's and the node module's events under the backend's names.
@@ -674,6 +705,22 @@ impl ZcashWalletBackendModule for ZcashWalletBackendModuleImpl {
 
     fn local_node(&self) -> String {
         self.core_read(modules().zcash_node_module.local_node(&self.active()))
+    }
+
+    fn set_tor_use(&self, mode: String) -> String {
+        if !self.custodian("set_tor_use") {
+            return refused();
+        }
+        let _routing = self.routing.lock().unwrap();
+        let opening = self.inner.lock().unwrap().jobs.pending().iter().any(|(_, j)| matches!(j.kind.as_str(), "open_wallet" | "create_wallet" | "restore_wallet"));
+        if opening || self.open_name().is_some() {
+            return err("close the wallet to change this");
+        }
+        self.core_read(modules().zcash_node_module.set_tor_use(&mode))
+    }
+
+    fn tor_use(&self) -> String {
+        self.core_read(modules().zcash_node_module.tor_use())
     }
 
     fn clear_suspect(&self, server_id: String) -> String {
