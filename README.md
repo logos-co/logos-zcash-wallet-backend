@@ -10,7 +10,7 @@ Two roles, each a set of module names. Both default to `zcash_wallet_ui`.
 
 | Role | Methods |
 |---|---|
-| custodian | `configure`, `create_wallet`, `restore_wallet`, `open_wallet`, `change_password`, `reveal_seed`, `export_viewing_key`, `set_active_network`, `apply_preset`, `set_proxy`, `set_servers`, `clear_suspect`, `watch_servers`, `set_local_node` |
+| custodian | `configure`, `create_wallet`, `restore_wallet`, `open_wallet`, `change_password`, `reveal_seed`, `export_viewing_key`, `set_active_network`, `apply_preset`, `set_proxy`, `set_servers`, `clear_suspect`, `watch_servers`, `set_local_node`, `set_tor_use` |
 | approver | `approve_send`, `approve_migration` |
 | either | `close_wallet`, `new_address`, `prepare_shielding`, `prepare_migration`, `pause_migration`, `resume_migration`, `cancel_migration` |
 | any named module | `prepare_send`, and `cancel_send` for its own request |
@@ -53,21 +53,35 @@ The backend hands the wallet core the node module's routes: the proxy, the sync 
 servers, and `direct`, the servers the user set to skip Tor. Servers on the user's own network
 need no proxy either. A route table that still needs a proxy, with none set, is refused.
 
+With Tor for what identifies you, the route table also names the classes that go direct
+(`directFor`: sync and tips), where lookups go, and who runs each server. The backend passes
+them on as `directFor`, `details`, `taddr` and `operators` (url to operator name), and only
+then, so a route table in either other mode reaches the core in the older shape.
+
 The backend tells the node module whose servers to check (`watch`): the open wallet's
 network's; with no wallet open, the active network's while the app shows them
 (`watch_servers(true)`, which lasts 3 minutes unless renewed); otherwise none.
 
+## Use Tor for
+
+`tor_use()` returns the node module's `{ torUse, torUseChosen, torUseMigrated }`: `all`,
+`identifying` or `none`, for every network. `set_tor_use(mode)` changes it, and is refused with
+"close the wallet to change this" while a wallet is open or an open, create or restore job is
+running: routes are taken when a wallet opens, so a change would not reach it. The backend also
+tells the node module which wallet is open (`set_wallet_open`), and the node keeps the same
+lock.
+
 ## The local node
 
 With `set_local_node(true)` every read goes to the node `zebrad_module` runs in-process,
-over Logos IPC, and broadcasts stay on the servers over Tor. With no server enabled at all,
+over Logos IPC, and broadcasts stay on the servers, over Tor unless Use Tor for is nothing. With no server enabled at all,
 the node broadcasts itself, over its own peer connections. `local_node()` reports whether
 it runs the active network.
 
 ## Everything else
 
 Reads (`wallet_status`, `sync_status`, `balances`, `receive_info`, `history`,
-`address_valid`, `servers`, `server_health`, `local_node`, `migration_status`) pass through to the engine
+`address_valid`, `servers`, `server_health`, `local_node`, `tor_use`, `migration_status`) pass through to the engine
 or the node module. Long operations return a backend job id; poll `job_status`. Events:
 `wallet_state_changed`, `sync_progress`, `balance_changed`, `server_health_changed`,
 `send_status_changed`, `migration_changed`, `job_finished`.
