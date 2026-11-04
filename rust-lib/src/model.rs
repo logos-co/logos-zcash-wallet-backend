@@ -239,6 +239,26 @@ mod tests {
     }
 
     #[test]
+    fn own_node_routes_reach_the_core_without_a_split() {
+        // The local node sending through servers: the node module names no direct class or server,
+        // so the core sends, checks and cross-checks through Tor in every mode.
+        let local = json!({"url": LOCAL_NODE_URL, "operator": "local"});
+        let rocks = json!({"url": "https://zec.rocks:443", "operator": "zec.rocks"});
+        for mode in ["all", "identifying", "none"] {
+            let t = json!({"ok": true, "proxy": "tor", "torUse": mode, "directFor": [], "direct": [],
+                           "sync": [local], "tip": [local], "details": [local], "taddr": [local], "broadcast": [rocks]});
+            assert_eq!(core_routes(&t).unwrap(),
+                       json!({"proxy": "tor", "servers": [LOCAL_NODE_URL], "broadcast": ["https://zec.rocks:443"]}), "{mode}");
+        }
+        // The user's own server with its Tor switch off: direct, and nothing else to split.
+        let own = json!({"url": "https://node.example.com:9067", "operator": "own"});
+        let t = json!({"ok": true, "proxy": "tor", "torUse": "identifying", "directFor": [], "direct": ["https://node.example.com:9067"],
+                       "sync": [own], "broadcast": [own]});
+        assert_eq!(core_routes(&t).unwrap(), json!({"proxy": "tor", "servers": ["https://node.example.com:9067"],
+                                                    "broadcast": ["https://node.example.com:9067"], "direct": ["https://node.example.com:9067"]}));
+    }
+
+    #[test]
     fn identifying_routes_carry_classes_lookups_and_operators() {
         let (a, b) = (json!({"url": "https://a.example:443", "operator": "A"}), json!({"url": "https://b.example:443", "operator": "B"}));
         let table = json!({"ok": true, "proxy": "tor", "torUse": "identifying", "directFor": ["sync", "tip"],

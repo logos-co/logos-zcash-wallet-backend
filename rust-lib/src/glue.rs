@@ -69,8 +69,16 @@ pub trait ZcashWalletBackendModule: Send + Sync + 'static {
     /// CUSTODIAN. The app shows the servers (renewed within 3 minutes) or no longer. With no
     /// wallet open, the active network's servers are checked only while it does.
     fn watch_servers(&self, on: bool) -> String;
-    /// CUSTODIAN. Reads from the local node (zebrad_module) over IPC; broadcasts stay on Tor.
+    /// CUSTODIAN. Reads from the local node (zebrad_module) over IPC; sends as set_local_sends says.
     fn set_local_node(&self, enabled: bool) -> String;
+    /// CUSTODIAN. Where the active network's chain comes from: `public`, `local` or `own`.
+    fn set_chain_source(&self, source: String) -> String;
+    /// CUSTODIAN. `{ url, tor, label? }`: the user's own server, which then takes every call;
+    /// an empty url forgets it.
+    fn set_own_server(&self, config_json: String) -> String;
+    /// CUSTODIAN. With the local node, sends go through the servers over Tor (`servers`) or
+    /// through the node, with no server contacted (`node`).
+    fn set_local_sends(&self, via: String) -> String;
     /// `{ ok, enabled, available, status?, error? }` for the active network.
     fn local_node(&self) -> String;
     /// CUSTODIAN. What goes through Tor on every network: `all`, `identifying` or `none`.
@@ -705,6 +713,27 @@ impl ZcashWalletBackendModule for ZcashWalletBackendModuleImpl {
 
     fn local_node(&self) -> String {
         self.core_read(modules().zcash_node_module.local_node(&self.active()))
+    }
+
+    fn set_chain_source(&self, source: String) -> String {
+        if !self.custodian("set_chain_source") {
+            return refused();
+        }
+        self.core_read(modules().zcash_node_module.set_chain_source(&self.active(), &source))
+    }
+
+    fn set_own_server(&self, config_json: String) -> String {
+        if !self.custodian("set_own_server") {
+            return refused();
+        }
+        self.core_read(modules().zcash_node_module.set_own_server(&self.active(), &config_json))
+    }
+
+    fn set_local_sends(&self, via: String) -> String {
+        if !self.custodian("set_local_sends") {
+            return refused();
+        }
+        self.core_read(modules().zcash_node_module.set_local_sends(&self.active(), &via))
     }
 
     fn set_tor_use(&self, mode: String) -> String {
