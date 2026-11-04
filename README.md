@@ -10,7 +10,7 @@ Two roles, each a set of module names. Both default to `zcash_wallet_ui`.
 
 | Role | Methods |
 |---|---|
-| custodian | `configure`, `create_wallet`, `restore_wallet`, `open_wallet`, `change_password`, `reveal_seed`, `export_viewing_key`, `set_active_network`, `apply_preset`, `set_proxy`, `set_servers`, `clear_suspect`, `watch_servers`, `set_local_node`, `set_tor_use` |
+| custodian | `configure`, `create_wallet`, `restore_wallet`, `open_wallet`, `change_password`, `reveal_seed`, `export_viewing_key`, `set_active_network`, `apply_preset`, `set_proxy`, `set_servers`, `clear_suspect`, `watch_servers`, `set_local_node`, `set_chain_source`, `set_own_server`, `set_local_sends`, `set_tor_use` |
 | approver | `approve_send`, `approve_migration` |
 | either | `close_wallet`, `new_address`, `prepare_shielding`, `prepare_migration`, `pause_migration`, `resume_migration`, `cancel_migration` |
 | any named module | `prepare_send`, and `cancel_send` for its own request |
@@ -71,12 +71,23 @@ running: routes are taken when a wallet opens, so a change would not reach it. T
 tells the node module which wallet is open (`set_wallet_open`), and the node keeps the same
 lock.
 
-## The local node
+## Where the chain comes from
 
-With `set_local_node(true)` every read goes to the node `zebrad_module` runs in-process,
-over Logos IPC, and broadcasts stay on the servers, over Tor unless Use Tor for is nothing. With no server enabled at all,
-the node broadcasts itself, over its own peer connections. `local_node()` reports whether
-it runs the active network.
+Passed to the node module for the active network. `set_chain_source(source)`: `public` (the
+server list, as Use Tor for says), `local` or `own`. Use Tor for applies to public servers only.
+
+- `local`, also `set_local_node(true)`: every read goes to the node `zebrad_module` runs
+  in-process, over Logos IPC. `set_local_sends("servers")`, the default, sends through the
+  servers, and every request to them goes through Tor whatever Use Tor for says: sends, the
+  check that follows one, the cross-check of the node's chain and the health checks.
+  `set_local_sends("node")` has the node send transactions itself, over its own peer
+  connections, and no server is contacted. `local_node()` reports whether it runs the active
+  network.
+- `own`: `set_own_server({ url, tor, label? })` saves the user's own lightwalletd and switches
+  to it. Every call goes to it alone: directly on the user's network, through Tor for an onion
+  service, and otherwise as `tor` says.
+
+The route table already says all of this, so the wallet core needs no change.
 
 ## Everything else
 
