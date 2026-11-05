@@ -6161,11 +6161,11 @@
         "rust-overlay": "rust-overlay_4"
       },
       "locked": {
-        "lastModified": 1791456664,
-        "narHash": "sha256-dZ13hsvZH+p50+gLS6yUNGFRveos8E8eS4c9qmCUqW4=",
+        "lastModified": 1793197624,
+        "narHash": "sha256-470uV/U7ZNdNYahZTVefKP56QW/KCQohPIfQ/MFV9vc=",
         "owner": "logos-co",
         "repo": "logos-zebra-nix",
-        "rev": "dd35e5c71e5f86d806cd4d58b8e409c936f99008",
+        "rev": "7895e2ed60dca02c07627d5373e9d76871d1f6cd",
         "type": "github"
       },
       "original": {
@@ -6191,11 +6191,11 @@
         "rust-overlay": "rust-overlay_5"
       },
       "locked": {
-        "lastModified": 1791456664,
-        "narHash": "sha256-dZ13hsvZH+p50+gLS6yUNGFRveos8E8eS4c9qmCUqW4=",
+        "lastModified": 1793197624,
+        "narHash": "sha256-470uV/U7ZNdNYahZTVefKP56QW/KCQohPIfQ/MFV9vc=",
         "owner": "logos-co",
         "repo": "logos-zebra-nix",
-        "rev": "dd35e5c71e5f86d806cd4d58b8e409c936f99008",
+        "rev": "7895e2ed60dca02c07627d5373e9d76871d1f6cd",
         "type": "github"
       },
       "original": {
@@ -9790,11 +9790,32 @@
         ]
       },
       "locked": {
-        "lastModified": 1793233167,
-        "narHash": "sha256-PTDOQMk3JS8snEErsGS2cW6l+DspDoQt/G219Z/pnWg=",
+        "lastModified": 1793890854,
+        "narHash": "sha256-muOOOPaCRrDVx8mKRu2k93ISZK3CwVhpr/VUa63E9qQ=",
         "owner": "logos-co",
         "repo": "logos-tor-module",
-        "rev": "6fba1edd753758930ce0cbc9a854be7863fd35e0",
+        "rev": "8a2ff25e6229293431293d31ed50b3f3bc1dfebc",
+        "type": "github"
+      },
+      "original": {
+        "owner": "logos-co",
+        "repo": "logos-tor-module",
+        "type": "github"
+      }
+    },
+    "tor_module_2": {
+      "inputs": {
+        "logos-module-builder": [
+          "zcash_wallet_core_module",
+          "logos-module-builder"
+        ]
+      },
+      "locked": {
+        "lastModified": 1793890854,
+        "narHash": "sha256-muOOOPaCRrDVx8mKRu2k93ISZK3CwVhpr/VUa63E9qQ=",
+        "owner": "logos-co",
+        "repo": "logos-tor-module",
+        "rev": "8a2ff25e6229293431293d31ed50b3f3bc1dfebc",
         "type": "github"
       },
       "original": {
@@ -9812,11 +9833,11 @@
         "zebrad_module": "zebrad_module"
       },
       "locked": {
-        "lastModified": 1793812496,
-        "narHash": "sha256-YDtYrxBg3qysQWTvp+8owVOZOLz5PWggYtiqp7PI1Mc=",
+        "lastModified": 1793893124,
+        "narHash": "sha256-T7GBAoFSiVIX0D/vXpVallm1Y8l1PXMzT1eXKnQEwes=",
         "owner": "logos-co",
         "repo": "logos-zcash-node-module",
-        "rev": "6b1325f00dd6772dbdeeb911ebcd4fc07f9991ec",
+        "rev": "ad57ab50b88b1b6aa5bd0bb7901a645d181fe228",
         "type": "github"
       },
       "original": {
@@ -9830,14 +9851,15 @@
         "logos-module-builder": [
           "logos-module-builder"
         ],
+        "tor_module": "tor_module_2",
         "zebrad_module": "zebrad_module_2"
       },
       "locked": {
-        "lastModified": 1791479612,
-        "narHash": "sha256-m6xGgsVdlk1uDlhAsUxJuQcP/st7Kr6qcG6bU4DQ4sw=",
+        "lastModified": 1793893135,
+        "narHash": "sha256-2b3+qCEbkWJDrLj8Uy1vGK6cdH/kxqSux50FlFKV+pQ=",
         "owner": "logos-co",
         "repo": "logos-zcash-wallet-core-module",
-        "rev": "6bdf4b9c1f674eab2da5b9cb47878b72216330d9",
+        "rev": "3f9ba7b43e99e52a5bcb0c61a7ce2f94ed0474be",
         "type": "github"
       },
       "original": {
@@ -9855,11 +9877,11 @@
         "logos-zebra-nix": "logos-zebra-nix"
       },
       "locked": {
-        "lastModified": 1791467372,
-        "narHash": "sha256-YevJL9mlH4pR9kz5sclU1yOH787J9VVEgxbzcEcCkJo=",
+        "lastModified": 1793890865,
+        "narHash": "sha256-eZws87lcvWdYg+psahvxnsv7bnC77GbiO2o/cYtKFq4=",
         "owner": "logos-co",
         "repo": "logos-zebrad-module",
-        "rev": "41f1e4294d04a840af2cbd90c4b5c9bd3057a4cb",
+        "rev": "6fa866344af89684f50b7a63919c17da0a60fdea",
         "type": "github"
       },
       "original": {
@@ -9877,11 +9899,11 @@
         "logos-zebra-nix": "logos-zebra-nix_2"
       },
       "locked": {
-        "lastModified": 1791467372,
-        "narHash": "sha256-YevJL9mlH4pR9kz5sclU1yOH787J9VVEgxbzcEcCkJo=",
+        "lastModified": 1793890865,
+        "narHash": "sha256-eZws87lcvWdYg+psahvxnsv7bnC77GbiO2o/cYtKFq4=",
         "owner": "logos-co",
         "repo": "logos-zebrad-module",
-        "rev": "41f1e4294d04a840af2cbd90c4b5c9bd3057a4cb",
+        "rev": "6fa866344af89684f50b7a63919c17da0a60fdea",
         "type": "github"
       },
       "original": {
