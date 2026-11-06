@@ -73,11 +73,11 @@ pub trait ZcashWalletBackendModule: Send + Sync + 'static {
     fn set_local_node(&self, enabled: bool) -> String;
     /// CUSTODIAN. Where the active network's chain comes from: `public`, `local` or `own`.
     fn set_chain_source(&self, source: String) -> String;
-    /// CUSTODIAN. `{ url, tor, label? }`: the user's own server, which then takes every call;
-    /// an empty url forgets it.
+    /// CUSTODIAN. `{ url, tor, label? }`: the user's own server, which then takes every read, and
+    /// the sends as set_local_sends says; an empty url forgets it.
     fn set_own_server(&self, config_json: String) -> String;
-    /// CUSTODIAN. With the local node, sends go through the servers over Tor (`servers`) or
-    /// through the node, with no server contacted (`node`).
+    /// CUSTODIAN. With your own node, in Logos or a server at an address, sends go through the
+    /// servers over Tor (`servers`) or through your node, with no server contacted (`node`).
     fn set_local_sends(&self, via: String) -> String;
     /// `{ ok, enabled, available, status?, error? }` for the active network.
     fn local_node(&self) -> String;

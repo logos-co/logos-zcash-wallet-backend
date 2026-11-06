@@ -85,8 +85,10 @@ server list, as Use Tor for says), `local` or `own`. Use Tor for applies to publ
   connections, and no server is contacted. `local_node()` reports whether it runs the active
   network.
 - `own`: `set_own_server({ url, tor, label? })` saves the user's own lightwalletd and switches
-  to it. Every call goes to it alone: directly on the user's network, through Tor for an onion
-  service, and otherwise as `tor` says.
+  to it. Every read goes to it: directly on the user's network, through Tor for an onion
+  service, and otherwise as `tor` says. Sends follow `set_local_sends` as for `local`: through
+  the servers over Tor (the default), or through the user's server with `node`. A node module
+  from before this sends through the user's server whatever it says.
 
 The route table already says all of this, so the wallet core needs no change.
 
