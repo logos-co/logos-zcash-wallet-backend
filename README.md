@@ -64,8 +64,9 @@ network's; with no wallet open, the active network's while the app shows them
 
 ## Use Tor for
 
-`tor_use()` returns the node module's `{ torUse, torUseChosen, torUseMigrated }`: `all`,
-`identifying` or `none`, for every network. `set_tor_use(mode)` changes it, and is refused with
+`tor_use()` returns the node module's `{ network, torUse, torUseChosen, torUseMigrated }` for the
+active network: `all`, `identifying` or `none`. `set_tor_use(mode)` changes it for the active
+network, and is refused with
 "close the wallet to change this" while a wallet is open or an open, create or restore job is
 running: routes are taken when a wallet opens, so a change would not reach it. The backend also
 tells the node module which wallet is open (`set_wallet_open`), and the node keeps the same
