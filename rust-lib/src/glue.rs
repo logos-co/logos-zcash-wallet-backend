@@ -81,10 +81,11 @@ pub trait ZcashWalletBackendModule: Send + Sync + 'static {
     fn set_local_sends(&self, via: String) -> String;
     /// `{ ok, enabled, available, status?, error? }` for the active network.
     fn local_node(&self) -> String;
-    /// CUSTODIAN. What goes through Tor on every network: `all`, `identifying` or `none`.
+    /// CUSTODIAN. What goes through Tor on the active network: `all`, `identifying` or `none`.
     /// Refused while a wallet is open or opening.
     fn set_tor_use(&self, mode: String) -> String;
-    /// `{ ok, torUse, torUseChosen, torUseMigrated }`, from the node module.
+    /// The active network's `{ ok, network, torUse, torUseChosen, torUseMigrated }`, from the
+    /// node module.
     fn tor_use(&self) -> String;
 
     /// Any named module. `request_json`: `{ recipients: [{ address, amount (zatoshis),
@@ -745,11 +746,11 @@ impl ZcashWalletBackendModule for ZcashWalletBackendModuleImpl {
         if opening || self.open_name().is_some() {
             return err("close the wallet to change this");
         }
-        self.core_read(modules().zcash_node_module.set_tor_use(&mode))
+        self.core_read(modules().zcash_node_module.set_tor_use(&self.active(), &mode))
     }
 
     fn tor_use(&self) -> String {
-        self.core_read(modules().zcash_node_module.tor_use())
+        self.core_read(modules().zcash_node_module.tor_use(&self.active()))
     }
 
     fn clear_suspect(&self, server_id: String) -> String {
