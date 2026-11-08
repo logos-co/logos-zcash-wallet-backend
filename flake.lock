@@ -9833,11 +9833,11 @@
         "zebrad_module": "zebrad_module"
       },
       "locked": {
-        "lastModified": 1793893124,
-        "narHash": "sha256-T7GBAoFSiVIX0D/vXpVallm1Y8l1PXMzT1eXKnQEwes=",
+        "lastModified": 1794100249,
+        "narHash": "sha256-pq8YwHWOhEwZHhmPk2VdYPZOiwWQjT/wLmjFsHoY09k=",
         "owner": "logos-co",
         "repo": "logos-zcash-node-module",
-        "rev": "ad57ab50b88b1b6aa5bd0bb7901a645d181fe228",
+        "rev": "83d8b1dd40e4a77e85f1027710c6b1e99480a37a",
         "type": "github"
       },
       "original": {
